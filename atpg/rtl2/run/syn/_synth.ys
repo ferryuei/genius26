@@ -1,0 +1,36 @@
+# Yosys synthesis script for riscv_core
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_defs.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_alu.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_csr.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_csr_regfile.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_decode.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_decoder.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_divider.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_exec.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_fetch.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_frontend.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_issue.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_lsu.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_mmu.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_multiplier.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_npc.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_pipe_ctrl.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_regfile.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/biriscv_xilinx_2r1w.v
+read_verilog -sv /home/fangzhen/genius/atpg/rtl2/run/../src/core/riscv_core.v
+
+# Hierarchy and elaboration
+hierarchy -check -top riscv_core
+
+# Synthesis - 使用完整的综合流程
+synth -top riscv_core
+
+# Flatten hierarchy
+flatten
+
+# Technology mapping for combinational logic only
+abc -g AND,NAND,OR,NOR,XOR,XNOR,MUX
+clean
+
+# Output - 不使用-noexpr以保留DFF的always块格式
+write_verilog -noattr /home/fangzhen/genius/atpg/rtl2/run/syn/riscv_core_synth.v

@@ -1,0 +1,27 @@
+nohup: ignoring input
+==============================================
+[ATPG] 生成测试向量
+[ATPG] 算法: auto
+[ATPG] 最大向量: 1000
+==============================================
+python3 -u /home/fangzhen/genius/atpg/rtl2/run/../../software/atpg.py /home/fangzhen/genius/atpg/rtl2/run/syn/riscv_core.bench \
+	--scan \
+	--algorithm auto \
+	--parallel \
+	-n 1000 \
+	-c 90 \
+	-o /home/fangzhen/genius/atpg/rtl2/run/atpg/riscv_core.stil \
+	-r stil \
+	2>&1 | tee /home/fangzhen/genius/atpg/rtl2/run/atpg/riscv_core_atpg.rpt
+Loaded circuit: riscv_core
+  Inputs: 3566
+  Outputs: 3055
+  Gates: 35660
+Generated 54322 faults for scan ATPG
+Running Scan-based ATPG...
+  Scan chain length: 1599
+  Real PIs: 3566
+  Pseudo PIs (scan cells): 1599
+  Combinational model: 5165 inputs, 4451 outputs
+  Phase 1: Random pattern generation...
+make: *** [Makefile:172: /home/fangzhen/genius/atpg/rtl2/run/atpg/riscv_core.stil] Terminated

@@ -1,0 +1,93 @@
+============================================================
+DFT SCAN CHAIN INSERTION TOOL (Enhanced)
+============================================================
+
+Reading netlist: /home/fangzhen/genius/atpg/rtl2/run/syn/riscv_core.bench
+
+Circuit: riscv_core
+  Inputs: 182
+  Outputs: 119
+  Gates: 57565
+Single clock domain detected: clk (6478 DFFs)
+
+Inserting 16 scan chain(s) for 6478 DFFs...
+
+============================================================
+SCAN CHAIN INSERTION REPORT
+============================================================
+Total chains: 16
+Total scan cells: 6478
+Max chain length: 405
+Min chain length: 404
+Shift cycles reduced: 6478 -> 405 (93.7% reduction)
+
+Chain details:
+  Chain 0: 405 cells
+    SI: scan_in_0, SO: scan_out_0
+    Clock domains: clk
+  Chain 1: 405 cells
+    SI: scan_in_1, SO: scan_out_1
+    Clock domains: clk
+  Chain 2: 405 cells
+    SI: scan_in_2, SO: scan_out_2
+    Clock domains: clk
+  Chain 3: 405 cells
+    SI: scan_in_3, SO: scan_out_3
+    Clock domains: clk
+  Chain 4: 405 cells
+    SI: scan_in_4, SO: scan_out_4
+    Clock domains: clk
+  Chain 5: 405 cells
+    SI: scan_in_5, SO: scan_out_5
+    Clock domains: clk
+  Chain 6: 405 cells
+    SI: scan_in_6, SO: scan_out_6
+    Clock domains: clk
+  Chain 7: 405 cells
+    SI: scan_in_7, SO: scan_out_7
+    Clock domains: clk
+  Chain 8: 405 cells
+    SI: scan_in_8, SO: scan_out_8
+    Clock domains: clk
+  Chain 9: 405 cells
+    SI: scan_in_9, SO: scan_out_9
+    Clock domains: clk
+  Chain 10: 405 cells
+    SI: scan_in_10, SO: scan_out_10
+    Clock domains: clk
+  Chain 11: 405 cells
+    SI: scan_in_11, SO: scan_out_11
+    Clock domains: clk
+  Chain 12: 405 cells
+    SI: scan_in_12, SO: scan_out_12
+    Clock domains: clk
+  Chain 13: 405 cells
+    SI: scan_in_13, SO: scan_out_13
+    Clock domains: clk
+  Chain 14: 404 cells
+    SI: scan_in_14, SO: scan_out_14
+    Clock domains: clk
+  Chain 15: 404 cells
+    SI: scan_in_15, SO: scan_out_15
+    Clock domains: clk
+============================================================
+
+Written: /home/fangzhen/genius/atpg/rtl2/run/dft/riscv_core_dft.bench
+Written: /home/fangzhen/genius/atpg/rtl2/run/dft/riscv_core_dft.v
+Written: /home/fangzhen/genius/atpg/rtl2/run/dft/riscv_core.scandef
+
+============================================================
+SUMMARY
+============================================================
+Total scan cells: 6478
+Number of chains: 16
+Max chain length: 405
+Shift cycles: 405 (was 6478 with single chain)
+
+Output files:
+  BENCH: /home/fangzhen/genius/atpg/rtl2/run/dft/riscv_core_dft.bench
+  Verilog: /home/fangzhen/genius/atpg/rtl2/run/dft/riscv_core_dft.v
+  ScanDef: /home/fangzhen/genius/atpg/rtl2/run/dft/riscv_core.scandef
+============================================================
+
+Done!

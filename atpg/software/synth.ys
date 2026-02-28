@@ -1,0 +1,33 @@
+# Yosys synthesis script for APB UART
+# Synthesize to gate-level netlist for ATPG
+
+# Read Verilog
+read_verilog ../src/apb_uart.v
+
+# Elaborate
+hierarchy -check -top apb_uart
+
+# High-level synthesis
+proc
+opt
+fsm
+opt
+memory
+opt
+
+# Technology mapping
+techmap
+opt
+
+# Map to simple gates (NOT is added automatically)
+abc -g AND,NAND,OR,NOR,XOR,XNOR
+
+# Flatten and clean
+flatten
+clean -purge
+
+# Write outputs
+write_verilog -noattr apb_uart_synth.v
+
+# Statistics
+stat

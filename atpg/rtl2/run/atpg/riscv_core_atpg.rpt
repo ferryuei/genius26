@@ -1,0 +1,11 @@
+Loaded circuit: riscv_core
+  Inputs: 182
+  Outputs: 119
+  Gates: 53808
+Generated 155108 faults for scan ATPG
+Running Scan-based ATPG...
+  Scan chain length: 6478
+  Real PIs: 182
+  Pseudo PIs (scan cells): 6478
+  Combinational model: 6660 inputs, 3070 outputs
+  Phase 1: Random pattern generation...

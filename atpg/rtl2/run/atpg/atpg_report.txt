@@ -1,0 +1,95 @@
+============================================================
+         ATPG Report - biRISC-V Core
+============================================================
+
+1. CIRCUIT INFORMATION
+----------------------------------------
+Design:            biRISC-V Dual-issue RISC-V Core
+Synthesis Tool:    Yosys
+Technology:        Generic gate-level
+
+Primary Inputs:    191
+Primary Outputs:   127
+Total Gates:       94,947
+Total Nets:        95,142
+Logic Levels:      146
+
+2. SCAN CHAIN CONFIGURATION
+----------------------------------------
+Number of Chains:  8
+Total Scan Cells:  6,478
+Chain Distribution:
+  Chain 0:         810 cells
+  Chain 1:         810 cells
+  Chain 2:         810 cells
+  Chain 3:         810 cells
+  Chain 4:         810 cells
+  Chain 5:         810 cells
+  Chain 6:         809 cells
+  Chain 7:         809 cells
+
+Shift Cycles:      810 (vs 6,478 single chain)
+Shift Reduction:   87.5%
+
+3. FAULT STATISTICS
+----------------------------------------
+Fault Model:       Stuck-at (SA0/SA1)
+Total SA Faults:   190,284
+Collapsed Faults:  190,219
+
+4. TEST GENERATION RESULTS
+----------------------------------------
+Method:            Random Pattern Generation
+Patterns Generated: 500
+Generation Time:   47.3 seconds
+
+Fault Activation Analysis (sampled):
+  Sample Size:     10,000 faults (5.3%)
+  Activation Rate: 14.1%
+  
+Coverage Estimates:
+  - Random patterns: ~12-15% (activation-based)
+  - With PODEM:      ~60-80% (estimated)
+  - Industry target: 95%+
+
+5. PERFORMANCE ANALYSIS
+----------------------------------------
+Circuit Simulation: 28ms per pattern (after JIT warmup)
+Pattern Generation: ~95ms per pattern
+Fault Simulation:   Limited by circuit size (95K gates)
+
+Optimization Features:
+  [x] NumPy array-based circuit representation
+  [x] Numba JIT compilation (enabled)
+  [x] SCOAP testability measures
+  [ ] Full parallel fault simulation (performance limited)
+  [ ] Incremental fault simulation
+
+6. RECOMMENDATIONS
+----------------------------------------
+1. For higher coverage, use commercial ATPG tools:
+   - Synopsys TetraMAX
+   - Cadence Modus
+   - Mentor Tessent
+
+2. Current tool is suitable for:
+   - Educational purposes
+   - Small to medium circuits (<10K gates)
+   - Basic DFT flow demonstration
+
+3. To improve coverage on this design:
+   - Implement scan-based sequential ATPG
+   - Use constraint-based test generation
+   - Apply functional patterns for processor testing
+
+7. OUTPUT FILES
+----------------------------------------
+test_patterns.txt    - Generated test vectors
+scan_def.txt         - Scan chain definitions
+riscv_core_scan.bench - Scan-inserted netlist
+atpg_report.txt      - This report
+
+============================================================
+Generated: 2026-02-06
+Tool: ATPG Software Suite v1.0
+============================================================
