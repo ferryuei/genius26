@@ -1,0 +1,497 @@
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2026  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.61+112 (git sha1 ac427a79b, g++ 11.4.0-1ubuntu1~22.04.2 -fPIC -O3)
+
+-- Executing script file `synth_all_modules.ys' --
+
+1. Executing Verilog-2005 frontend: ../rtl/ddr_stages.v
+Parsing SystemVerilog input from `../rtl/ddr_stages.v' to AST representation.
+Generating RTLIL representation for module `\ddr_input_stage'.
+Generating RTLIL representation for module `\ddr_output_stage'.
+Successfully finished Verilog frontend.
+
+2. Executing Verilog-2005 frontend: ../rtl/synchronizer.v
+Parsing SystemVerilog input from `../rtl/synchronizer.v' to AST representation.
+Generating RTLIL representation for module `\synchronizer'.
+Successfully finished Verilog frontend.
+
+3. Executing Verilog-2005 frontend: ../rtl/async_fifo.v
+Parsing SystemVerilog input from `../rtl/async_fifo.v' to AST representation.
+Generating RTLIL representation for module `\async_fifo'.
+Warning: Replacing memory \wr_ptr_gray_sync with list of registers. See ../rtl/async_fifo.v:137
+Warning: Replacing memory \rd_ptr_gray_sync with list of registers. See ../rtl/async_fifo.v:97
+Successfully finished Verilog frontend.
+
+4. Executing Verilog-2005 frontend: ../rtl/ecat_phy_interface.v
+Parsing SystemVerilog input from `../rtl/ecat_phy_interface.v' to AST representation.
+../rtl/ecat_phy_interface.v:116: Warning: Yosys has only limited support for tri-state logic at the moment.
+Generating RTLIL representation for module `\ecat_phy_interface'.
+Successfully finished Verilog frontend.
+
+5. Executing Verilog-2005 frontend: ../rtl/ecat_dpram.sv
+Parsing SystemVerilog input from `../rtl/ecat_dpram.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_dpram'.
+Warning: Replacing memory \memory with list of registers. See ../rtl/ecat_dpram.sv:100
+Successfully finished Verilog frontend.
+
+6. Executing Verilog-2005 frontend: ../rtl/ecat_fmmu.sv
+Parsing SystemVerilog input from `../rtl/ecat_fmmu.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_fmmu'.
+Generating RTLIL representation for module `\ecat_fmmu_array'.
+Warning: wire '\phy_addr' is assigned in a block at ../rtl/ecat_fmmu.sv:411.13-411.50.
+Warning: wire '\phy_wr' is assigned in a block at ../rtl/ecat_fmmu.sv:412.13-412.46.
+Warning: wire '\phy_wdata' is assigned in a block at ../rtl/ecat_fmmu.sv:413.13-413.52.
+Warning: wire '\phy_addr' is assigned in a block at ../rtl/ecat_fmmu.sv:416.13-416.26.
+Warning: wire '\phy_wr' is assigned in a block at ../rtl/ecat_fmmu.sv:417.13-417.26.
+Warning: wire '\phy_wdata' is assigned in a block at ../rtl/ecat_fmmu.sv:418.13-418.27.
+Successfully finished Verilog frontend.
+
+7. Executing Verilog-2005 frontend: ../rtl/ecat_sync_manager.sv
+Parsing SystemVerilog input from `../rtl/ecat_sync_manager.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_sync_manager'.
+Generating RTLIL representation for module `\ecat_sync_manager_array'.
+Warning: wire '\mem_wr' is assigned in a block at ../rtl/ecat_sync_manager.sv:647.13-647.46.
+Warning: wire '\mem_addr' is assigned in a block at ../rtl/ecat_sync_manager.sv:648.13-648.50.
+Warning: wire '\mem_wdata' is assigned in a block at ../rtl/ecat_sync_manager.sv:649.13-649.52.
+Warning: wire '\mem_wr' is assigned in a block at ../rtl/ecat_sync_manager.sv:651.13-651.26.
+Warning: wire '\mem_addr' is assigned in a block at ../rtl/ecat_sync_manager.sv:652.13-652.26.
+Warning: wire '\mem_wdata' is assigned in a block at ../rtl/ecat_sync_manager.sv:653.13-653.27.
+Successfully finished Verilog frontend.
+
+8. Executing Verilog-2005 frontend: ../rtl/ecat_frame_receiver.sv
+Parsing SystemVerilog input from `../rtl/ecat_frame_receiver.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_frame_receiver'.
+Warning: Replacing memory \wr_data with list of registers. See ../rtl/ecat_frame_receiver.sv:369
+Warning: Replacing memory \wr_addr with list of registers. See ../rtl/ecat_frame_receiver.sv:368
+Successfully finished Verilog frontend.
+
+9. Executing Verilog-2005 frontend: ../rtl/ecat_frame_transmitter.sv
+Parsing SystemVerilog input from `../rtl/ecat_frame_transmitter.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_frame_transmitter'.
+Warning: Replacing memory \frame_buffer with list of registers. See ../rtl/ecat_frame_transmitter.sv:143
+../rtl/ecat_frame_transmitter.sv:232: Warning: Range [3:0] select out of bounds on signal `\current_port_idx': Setting 1 MSB bits to undef.
+Successfully finished Verilog frontend.
+
+10. Executing Verilog-2005 frontend: ../rtl/ecat_register_map.sv
+Parsing SystemVerilog input from `../rtl/ecat_register_map.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_register_map'.
+Successfully finished Verilog frontend.
+
+11. Executing Verilog-2005 frontend: ../rtl/ecat_dc.sv
+Parsing SystemVerilog input from `../rtl/ecat_dc.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_dc'.
+Warning: Replacing memory \port_recv_time with list of registers. See ../rtl/ecat_dc.sv:205
+Successfully finished Verilog frontend.
+
+12. Executing Verilog-2005 frontend: ../rtl/ecat_al_statemachine.sv
+Parsing SystemVerilog input from `../rtl/ecat_al_statemachine.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_al_statemachine'.
+Successfully finished Verilog frontend.
+
+13. Executing Verilog-2005 frontend: ../rtl/ecat_pdi_avalon.sv
+Parsing SystemVerilog input from `../rtl/ecat_pdi_avalon.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_pdi_avalon'.
+Successfully finished Verilog frontend.
+
+14. Executing Verilog-2005 frontend: ../rtl/ecat_core_main.sv
+Parsing SystemVerilog input from `../rtl/ecat_core_main.sv' to AST representation.
+Generating RTLIL representation for module `\ecat_core_main'.
+Warning: wire '\SCL2049' is assigned in a block at ../rtl/ecat_core_main.sv:457.13-457.28.
+Warning: wire '\SCL2049' is assigned in a block at ../rtl/ecat_core_main.sv:463.17-463.32.
+Warning: wire '\TCL2044' is assigned in a block at ../rtl/ecat_core_main.sv:469.13-469.28.
+Warning: wire '\TCL2044' is assigned in a block at ../rtl/ecat_core_main.sv:475.17-475.32.
+Warning: Replacing memory \GPD3560 with list of registers. See ../rtl/ecat_core_main.sv:390
+../rtl/ecat_core_main.sv:449: Warning: Identifier `\FS_3577' is implicitly declared.
+Successfully finished Verilog frontend.
+
+15. Executing HIERARCHY pass (managing design hierarchy).
+Parameter \FMMU_ID = 7
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.1. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 7
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu'.
+Parameter \FMMU_ID = 6
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.2. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 6
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$ad3dd16b09ba4b58569671eb5a436045c6271dd4\ecat_fmmu'.
+Parameter \FMMU_ID = 5
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.3. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 5
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$4ca849abb3e6016cdfcba28435e5af4f91fc0c67\ecat_fmmu'.
+Parameter \FMMU_ID = 4
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.4. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 4
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$b408117655ef581aee060fb95bf7f6c70f90ae14\ecat_fmmu'.
+Parameter \FMMU_ID = 3
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.5. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 3
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$8753e096ba824e5043462f28496ede5dca750203\ecat_fmmu'.
+Parameter \FMMU_ID = 2
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.6. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 2
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$9105d3804b379781e51bf10cdb9ac285ba1c7100\ecat_fmmu'.
+Parameter \FMMU_ID = 1
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.7. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 1
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$0a4d3e929c711a01c763cd3d12dfb1ba6313a202\ecat_fmmu'.
+Parameter \FMMU_ID = 0
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+
+15.8. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_fmmu'.
+Parameter \FMMU_ID = 0
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Generating RTLIL representation for module `$paramod$ea9ef438d4f770c38a71b3790160ae09c43663ac\ecat_fmmu'.
+Reprocessing module ecat_fmmu_array because instantiated module $paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu has become available.
+Generating RTLIL representation for module `\ecat_fmmu_array'.
+Warning: wire '\phy_addr' is assigned in a block at ../rtl/ecat_fmmu.sv:411.13-411.50.
+Warning: wire '\phy_wr' is assigned in a block at ../rtl/ecat_fmmu.sv:412.13-412.46.
+Warning: wire '\phy_wdata' is assigned in a block at ../rtl/ecat_fmmu.sv:413.13-413.52.
+Warning: wire '\phy_addr' is assigned in a block at ../rtl/ecat_fmmu.sv:416.13-416.26.
+Warning: wire '\phy_wr' is assigned in a block at ../rtl/ecat_fmmu.sv:417.13-417.26.
+Warning: wire '\phy_wdata' is assigned in a block at ../rtl/ecat_fmmu.sv:418.13-418.27.
+Parameter \SM_ID = 7
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.9. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 7
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager'.
+Parameter \SM_ID = 6
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.10. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 6
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager'.
+Parameter \SM_ID = 5
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.11. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 5
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager'.
+Parameter \SM_ID = 4
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.12. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 4
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager'.
+Parameter \SM_ID = 3
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.13. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 3
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager'.
+Parameter \SM_ID = 2
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.14. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 2
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager'.
+Parameter \SM_ID = 1
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.15. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 1
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager'.
+Parameter \SM_ID = 0
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+
+15.16. Executing AST frontend in derive mode using pre-parsed AST for module `\ecat_sync_manager'.
+Parameter \SM_ID = 0
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Generating RTLIL representation for module `$paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager'.
+Reprocessing module ecat_sync_manager_array because instantiated module $paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager has become available.
+Generating RTLIL representation for module `\ecat_sync_manager_array'.
+Warning: wire '\mem_wr' is assigned in a block at ../rtl/ecat_sync_manager.sv:647.13-647.46.
+Warning: wire '\mem_addr' is assigned in a block at ../rtl/ecat_sync_manager.sv:648.13-648.50.
+Warning: wire '\mem_wdata' is assigned in a block at ../rtl/ecat_sync_manager.sv:649.13-649.52.
+Warning: wire '\mem_wr' is assigned in a block at ../rtl/ecat_sync_manager.sv:651.13-651.26.
+Warning: wire '\mem_addr' is assigned in a block at ../rtl/ecat_sync_manager.sv:652.13-652.26.
+Warning: wire '\mem_wdata' is assigned in a block at ../rtl/ecat_sync_manager.sv:653.13-653.27.
+Parameter \FMMU_ID = 7
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu'.
+Parameter \FMMU_ID = 6
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$ad3dd16b09ba4b58569671eb5a436045c6271dd4\ecat_fmmu'.
+Parameter \FMMU_ID = 5
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$4ca849abb3e6016cdfcba28435e5af4f91fc0c67\ecat_fmmu'.
+Parameter \FMMU_ID = 4
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$b408117655ef581aee060fb95bf7f6c70f90ae14\ecat_fmmu'.
+Parameter \FMMU_ID = 3
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$8753e096ba824e5043462f28496ede5dca750203\ecat_fmmu'.
+Parameter \FMMU_ID = 2
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$9105d3804b379781e51bf10cdb9ac285ba1c7100\ecat_fmmu'.
+Parameter \FMMU_ID = 1
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$0a4d3e929c711a01c763cd3d12dfb1ba6313a202\ecat_fmmu'.
+Parameter \FMMU_ID = 0
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 32
+Found cached RTLIL representation for module `$paramod$ea9ef438d4f770c38a71b3790160ae09c43663ac\ecat_fmmu'.
+Parameter \SM_ID = 7
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager'.
+Parameter \SM_ID = 6
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager'.
+Parameter \SM_ID = 5
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager'.
+Parameter \SM_ID = 4
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager'.
+Parameter \SM_ID = 3
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager'.
+Parameter \SM_ID = 2
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager'.
+Parameter \SM_ID = 1
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager'.
+Parameter \SM_ID = 0
+Parameter \ADDR_WIDTH = 16
+Parameter \DATA_WIDTH = 8
+Found cached RTLIL representation for module `$paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager'.
+
+16. Executing PROC pass (convert processes to netlists).
+
+16.1. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Found and cleaned up 1 empty switch in `\ecat_dpram.$proc$../rtl/ecat_dpram.sv:125$185'.
+Found and cleaned up 1 empty switch in `\ecat_dpram.$proc$../rtl/ecat_dpram.sv:80$128'.
+Cleaned up 2 empty switches.
+
+16.2. Executing PROC_RMDEAD pass (remove dead branches from decision trees).
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$2999 in module $paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$2984 in module $paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$2982 in module $paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$2974 in module $paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$2971 in module $paramod$68f5acbb85f0e0102c61ea198e42310b7f5752f5\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$2812 in module $paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$2797 in module $paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$2795 in module $paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$2787 in module $paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$2784 in module $paramod$e4a20dae4568a24d06abe34e03c56e0f7d0c1819\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$2625 in module $paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$2610 in module $paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$2608 in module $paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$2600 in module $paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$2597 in module $paramod$9b1b7096d7e832b112f394c6be189cc8cfc5e9da\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$2438 in module $paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$2423 in module $paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$2421 in module $paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$2413 in module $paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$2410 in module $paramod$63fee20176ad95c9a56c98ad3b2f64b09a1eec17\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$2251 in module $paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$2236 in module $paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$2234 in module $paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$2226 in module $paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$2223 in module $paramod$e76e1b057582b70b931e9a856efca8577dd334e6\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$2064 in module $paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$2049 in module $paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$2047 in module $paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$2039 in module $paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$2036 in module $paramod$68d94cf959fcf0ab3eaf378ac1f5f230522c222d\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$1877 in module $paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$1862 in module $paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$1860 in module $paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$1852 in module $paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$1849 in module $paramod$5a2d689c3e47965f8ca6b187bc97997671a60f45\ecat_sync_manager.
+Removed 4 dead cases from process $proc$../rtl/ecat_fmmu.sv:409$1764 in module ecat_fmmu_array.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:409$1764 in module ecat_fmmu_array.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:395$1743 in module ecat_fmmu_array.
+Removed 3 dead cases from process $proc$../rtl/ecat_sync_manager.sv:645$3481 in module ecat_sync_manager_array.
+Marked 20 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:645$3481 in module ecat_sync_manager_array.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:629$3460 in module ecat_sync_manager_array.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1610 in module $paramod$0a4d3e929c711a01c763cd3d12dfb1ba6313a202\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1604 in module $paramod$0a4d3e929c711a01c763cd3d12dfb1ba6313a202\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1602 in module $paramod$0a4d3e929c711a01c763cd3d12dfb1ba6313a202\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1599 in module $paramod$0a4d3e929c711a01c763cd3d12dfb1ba6313a202\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1576 in module $paramod$9105d3804b379781e51bf10cdb9ac285ba1c7100\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1570 in module $paramod$9105d3804b379781e51bf10cdb9ac285ba1c7100\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1568 in module $paramod$9105d3804b379781e51bf10cdb9ac285ba1c7100\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1565 in module $paramod$9105d3804b379781e51bf10cdb9ac285ba1c7100\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1542 in module $paramod$8753e096ba824e5043462f28496ede5dca750203\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1536 in module $paramod$8753e096ba824e5043462f28496ede5dca750203\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1534 in module $paramod$8753e096ba824e5043462f28496ede5dca750203\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1531 in module $paramod$8753e096ba824e5043462f28496ede5dca750203\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1508 in module $paramod$b408117655ef581aee060fb95bf7f6c70f90ae14\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1502 in module $paramod$b408117655ef581aee060fb95bf7f6c70f90ae14\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1500 in module $paramod$b408117655ef581aee060fb95bf7f6c70f90ae14\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1497 in module $paramod$b408117655ef581aee060fb95bf7f6c70f90ae14\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1474 in module $paramod$4ca849abb3e6016cdfcba28435e5af4f91fc0c67\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1468 in module $paramod$4ca849abb3e6016cdfcba28435e5af4f91fc0c67\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1466 in module $paramod$4ca849abb3e6016cdfcba28435e5af4f91fc0c67\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1463 in module $paramod$4ca849abb3e6016cdfcba28435e5af4f91fc0c67\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1440 in module $paramod$ad3dd16b09ba4b58569671eb5a436045c6271dd4\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1434 in module $paramod$ad3dd16b09ba4b58569671eb5a436045c6271dd4\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1432 in module $paramod$ad3dd16b09ba4b58569671eb5a436045c6271dd4\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1429 in module $paramod$ad3dd16b09ba4b58569671eb5a436045c6271dd4\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1406 in module $paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1400 in module $paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1398 in module $paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1395 in module $paramod$6b32118ce2c60b79c4c74820732a9f5616204ed6\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:400$1375 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:388$1371 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:400$1365 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:388$1361 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:467$1307 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:455$1303 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:425$1292 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:418$1290 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:370$1282 in module ecat_core_main.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:358$1278 in module ecat_core_main.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:328$1274 in module ecat_core_main.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:311$1270 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:303$1267 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:245$1264 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:235$1260 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_core_main.sv:222$1254 in module ecat_core_main.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_pdi_avalon.sv:326$1241 in module ecat_pdi_avalon.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_pdi_avalon.sv:304$1234 in module ecat_pdi_avalon.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_pdi_avalon.sv:284$1227 in module ecat_pdi_avalon.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_pdi_avalon.sv:151$1217 in module ecat_pdi_avalon.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_pdi_avalon.sv:109$1208 in module ecat_pdi_avalon.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_pdi_avalon.sv:102$1206 in module ecat_pdi_avalon.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_al_statemachine.sv:306$1204 in module ecat_al_statemachine.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_al_statemachine.sv:267$1192 in module ecat_al_statemachine.
+Marked 13 switch rules as full_case in process $proc$../rtl/ecat_al_statemachine.sv:158$1177 in module ecat_al_statemachine.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_al_statemachine.sv:108$1113 in module ecat_al_statemachine.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:413$1108 in module ecat_dc.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:360$1090 in module ecat_dc.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:334$1080 in module ecat_dc.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:271$1049 in module ecat_dc.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:224$1034 in module ecat_dc.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:202$1024 in module ecat_dc.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_dc.sv:175$1016 in module ecat_dc.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_register_map.sv:272$1003 in module ecat_register_map.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_register_map.sv:180$998 in module ecat_register_map.
+Marked 13 switch rules as full_case in process $proc$../rtl/ecat_frame_transmitter.sv:208$932 in module ecat_frame_transmitter.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_frame_transmitter.sv:182$907 in module ecat_frame_transmitter.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_frame_transmitter.sv:166$893 in module ecat_frame_transmitter.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_frame_transmitter.sv:133$864 in module ecat_frame_transmitter.
+Marked 7 switch rules as full_case in process $proc$../rtl/ecat_frame_transmitter.sv:87$856 in module ecat_frame_transmitter.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_frame_transmitter.sv:80$854 in module ecat_frame_transmitter.
+Removed 2 dead cases from process $proc$../rtl/ecat_frame_receiver.sv:196$656 in module ecat_frame_receiver.
+Marked 31 switch rules as full_case in process $proc$../rtl/ecat_frame_receiver.sv:196$656 in module ecat_frame_receiver.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$3186 in module $paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$3171 in module $paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$3169 in module $paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$3161 in module $paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$3158 in module $paramod$3c7627fc78a8656d5cffc302ba819e8ac1522bb4\ecat_sync_manager.
+Marked 14 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:317$399 in module ecat_sync_manager.
+Marked 8 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:261$384 in module ecat_sync_manager.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:253$382 in module ecat_sync_manager.
+Marked 4 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:198$374 in module ecat_sync_manager.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_sync_manager.sv:152$371 in module ecat_sync_manager.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$1644 in module $paramod$ea9ef438d4f770c38a71b3790160ae09c43663ac\ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$1638 in module $paramod$ea9ef438d4f770c38a71b3790160ae09c43663ac\ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$1636 in module $paramod$ea9ef438d4f770c38a71b3790160ae09c43663ac\ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$1633 in module $paramod$ea9ef438d4f770c38a71b3790160ae09c43663ac\ecat_fmmu.
+Marked 3 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:233$281 in module ecat_fmmu.
+Marked 5 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:186$275 in module ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:178$273 in module ecat_fmmu.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_fmmu.sv:118$270 in module ecat_fmmu.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_dpram.sv:179$246 in module ecat_dpram.
+Removed 2 dead cases from process $proc$../rtl/ecat_dpram.sv:125$185 in module ecat_dpram.
+Marked 11 switch rules as full_case in process $proc$../rtl/ecat_dpram.sv:125$185 in module ecat_dpram.
+Removed 2 dead cases from process $proc$../rtl/ecat_dpram.sv:80$128 in module ecat_dpram.
+Marked 10 switch rules as full_case in process $proc$../rtl/ecat_dpram.sv:80$128 in module ecat_dpram.
+Marked 1 switch rules as full_case in process $proc$../rtl/ecat_phy_interface.v:166$101 in module ecat_phy_interface.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_phy_interface.v:118$96 in module ecat_phy_interface.
+Marked 2 switch rules as full_case in process $proc$../rtl/ecat_phy_interface.v:95$91 in module ecat_phy_interface.
+Marked 1 switch rules as full_case in process $proc$../rtl/async_fifo.v:134$57 in module async_fifo.
+Marked 1 switch rules as full_case in process $proc$../rtl/async_fifo.v:118$53 in module async_fifo.
+Marked 1 switch rules as full_case in process $proc$../rtl/async_fifo.v:94$45 in module async_fifo.
+Marked 1 switch rules as full_case in process $proc$../rtl/async_fifo.v:87$36 in module async_fifo.
+Marked 1 switch rules as full_case in process $proc$../rtl/async_fifo.v:76$34 in module async_fifo.
+Marked 2 switch rules as full_case in process $proc$../rtl/synchronizer.v:52$12 in module synchronizer.
+Marked 1 switch rules as full_case in process $proc$../rtl/synchronizer.v:41$10 in module synchronizer.
+Marked 1 switch rules as full_case in process $proc$../rtl/ddr_stages.v:75$9 in module ddr_output_stage.
+Marked 1 switch rules as full_case in process $proc$../rtl/ddr_stages.v:67$8 in module ddr_output_stage.
+Marked 1 switch rules as full_case in process $proc$../rtl/ddr_stages.v:42$6 in module ddr_input_stage.
+Marked 1 switch rules as full_case in process $proc$../rtl/ddr_stages.v:33$4 in module ddr_input_stage.
+Marked 1 switch rules as full_case in process $proc$../rtl/ddr_stages.v:24$2 in module ddr_input_stage.
+Removed a total of 13 dead cases.
+
+16.3. Executing PROC_PRUNE pass (remove redundant assignments in processes).
