@@ -1,0 +1,18 @@
+# Simple test circuit - 2-input AND gate
+# c17 ISCAS benchmark circuit (simplified)
+
+INPUT(in1)
+INPUT(in2)
+INPUT(in3)
+INPUT(in4)
+INPUT(in5)
+
+OUTPUT(out1)
+OUTPUT(out2)
+
+n1 = NAND(in1, in3)
+n2 = NAND(in3, in4)
+n3 = NAND(in2, n1)
+n4 = NAND(n2, in5)
+out1 = NAND(n1, n3)
+out2 = NAND(n2, n4)

@@ -1,0 +1,16 @@
+# 创建测试电路
+INPUT(a)
+INPUT(b)
+INPUT(c)
+INPUT(d)
+INPUT(clk)
+
+n1 = DFF(d, clk)
+n2 = DFF(a, clk)
+n3 = DFF(b, clk)
+n4 = DFF(c, clk)
+n5 = AND(n1, n2)
+n6 = OR(n3, n4)
+out1 = XOR(n5, n6)
+
+OUTPUT(out1)
