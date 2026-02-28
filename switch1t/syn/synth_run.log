@@ -1,0 +1,17 @@
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2026  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.61+112 (git sha1 ac427a79b, g++ 11.4.0-1ubuntu1~22.04.2 -fPIC -O3)
+
+-- Executing script file `synth.ys' --
+
+1. Executing Verilog-2005 frontend: ../rtl/switch_pkg.sv
+Parsing SystemVerilog input from `../rtl/switch_pkg.sv' to AST representation.
+Successfully finished Verilog frontend.
+
+2. Executing Verilog-2005 frontend: ../rtl/cell_allocator.sv
+Parsing SystemVerilog input from `../rtl/cell_allocator.sv' to AST representation.
+../rtl/cell_allocator.sv:8: ERROR: syntax error, unexpected TOK_IMPORT, expecting '#' or '(' or ';'

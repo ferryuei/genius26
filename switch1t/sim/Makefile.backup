@@ -1,0 +1,185 @@
+#============================================================================
+# Makefile - 1.2Tbps 48x25G L2 Switch Core Verilator Simulation
+#============================================================================
+
+# 工具配置
+VERILATOR    = verilator
+VERILATOR_COV = verilator_coverage
+GTKWAVE      = gtkwave
+
+# 目录配置
+RTL_DIR      = ../rtl
+SIM_DIR      = .
+OBJ_DIR      = obj_dir
+COV_OBJ_DIR  = obj_cov
+COV_ANN_DIR  = coverage_annotate
+
+# 顶层模块
+TOP_MODULE   = switch_core
+
+# 源文件
+FILELIST     = ./filelist.f
+CPP_SRC      = sim_main.cpp
+
+# Verilator 基础选项
+VERILATOR_FLAGS  = --cc --exe --build --timing -j 4
+VERILATOR_FLAGS += -Wno-UNUSEDSIGNAL -Wno-UNDRIVEN -Wno-PINCONNECTEMPTY
+VERILATOR_FLAGS += -Wno-UNUSEDPARAM -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC
+VERILATOR_FLAGS += -Wno-CASEINCOMPLETE -Wno-MULTIDRIVEN -Wno-IMPLICITSTATIC
+
+# 输出文件
+EXEC         = $(OBJ_DIR)/V$(TOP_MODULE)
+EXEC_COV     = $(COV_OBJ_DIR)/V$(TOP_MODULE)
+VCD_FILE     = wave.vcd
+COV_FILE     = coverage.dat
+
+#============================================================================
+# 默认目标
+#============================================================================
+.PHONY: all build run trace coverage report clean help
+
+all: build run
+
+#============================================================================
+# 编译目标
+#============================================================================
+build: $(EXEC)
+
+$(EXEC): $(CPP_SRC) $(FILELIST)
+	@echo "============================================"
+	@echo "  Building $(TOP_MODULE) Simulation"
+	@echo "============================================"
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		-f $(FILELIST) \
+		$(CPP_SRC) \
+		--top-module $(TOP_MODULE) \
+		--Mdir $(OBJ_DIR)
+	@echo "Build complete: $(EXEC)"
+
+build-trace: $(CPP_SRC) $(FILELIST)
+	@echo "============================================"
+	@echo "  Building with Trace Support"
+	@echo "============================================"
+	$(VERILATOR) $(VERILATOR_FLAGS) --trace \
+		-f $(FILELIST) \
+		$(CPP_SRC) \
+		--top-module $(TOP_MODULE) \
+		--Mdir $(OBJ_DIR)
+	@echo "Build complete (trace enabled): $(EXEC)"
+
+build-cov: $(EXEC_COV)
+
+$(EXEC_COV): $(CPP_SRC) $(FILELIST)
+	@echo "============================================"
+	@echo "  Building with Coverage Support"
+	@echo "============================================"
+	$(VERILATOR) $(VERILATOR_FLAGS) --coverage \
+		-f $(FILELIST) \
+		$(CPP_SRC) \
+		--top-module $(TOP_MODULE) \
+		--Mdir $(COV_OBJ_DIR)
+	@echo "Build complete (coverage enabled): $(EXEC_COV)"
+
+#============================================================================
+# 运行目标
+#============================================================================
+run: $(EXEC)
+	@echo "============================================"
+	@echo "  Running Simulation"
+	@echo "============================================"
+	$(EXEC)
+
+run-quick: $(EXEC)
+	@echo "============================================"
+	@echo "  Running Quick Test"
+	@echo "============================================"
+	$(EXEC) --quick
+
+trace: build-trace
+	@echo "============================================"
+	@echo "  Running Simulation with Trace"
+	@echo "============================================"
+	$(EXEC) --trace
+	@echo "Waveform written to: $(VCD_FILE)"
+
+wave: $(VCD_FILE)
+	@echo "Opening waveform in GTKWave..."
+	$(GTKWAVE) $(VCD_FILE) &
+
+#============================================================================
+# 覆盖率目标
+#============================================================================
+coverage: build-cov
+	@echo "============================================"
+	@echo "  Running Coverage Simulation"
+	@echo "============================================"
+	$(EXEC_COV)
+	@echo "Coverage data written to: $(COV_FILE)"
+
+report: $(COV_FILE)
+	@echo "============================================"
+	@echo "  Generating Coverage Report"
+	@echo "============================================"
+	$(VERILATOR_COV) --annotate $(COV_ANN_DIR) $(COV_FILE)
+	@echo ""
+	@echo "Coverage Summary:"
+	@$(VERILATOR_COV) $(COV_FILE)
+	@echo ""
+	@echo "Annotation files: $(COV_ANN_DIR)/"
+	@echo "View uncovered lines: grep '%00' $(COV_ANN_DIR)/*.sv"
+
+cov-rank: $(COV_FILE)
+	@echo "============================================"
+	@echo "  Coverage Ranking by Module"
+	@echo "============================================"
+	$(VERILATOR_COV) --rank $(COV_FILE)
+
+cov-all: coverage report
+
+#============================================================================
+# 清理目标
+#============================================================================
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -rf $(OBJ_DIR) $(COV_OBJ_DIR)
+	rm -f $(VCD_FILE) $(COV_FILE)
+	rm -rf $(COV_ANN_DIR)
+	@echo "Clean complete."
+
+clean-cov:
+	rm -rf $(COV_OBJ_DIR) $(COV_FILE) $(COV_ANN_DIR)
+
+#============================================================================
+# 帮助
+#============================================================================
+help:
+	@echo "============================================"
+	@echo "  1.2Tbps Switch Core - Makefile Targets"
+	@echo "============================================"
+	@echo ""
+	@echo "编译目标:"
+	@echo "  build       - 编译仿真器 (默认)"
+	@echo "  build-trace - 编译仿真器 (带波形支持)"
+	@echo "  build-cov   - 编译仿真器 (带覆盖率支持)"
+	@echo ""
+	@echo "运行目标:"
+	@echo "  run         - 运行仿真"
+	@echo "  run-quick   - 运行快速测试"
+	@echo "  trace       - 运行仿真并生成VCD波形"
+	@echo "  wave        - 用GTKWave打开波形文件"
+	@echo ""
+	@echo "覆盖率目标:"
+	@echo "  coverage    - 运行覆盖率仿真"
+	@echo "  report      - 生成覆盖率报告"
+	@echo "  cov-rank    - 按模块显示覆盖率排名"
+	@echo "  cov-all     - 运行覆盖率仿真并生成报告"
+	@echo ""
+	@echo "其他目标:"
+	@echo "  clean       - 清理所有构建产物"
+	@echo "  clean-cov   - 仅清理覆盖率相关文件"
+	@echo "  help        - 显示帮助信息"
+	@echo ""
+	@echo "常用命令:"
+	@echo "  make                  - 编译并运行"
+	@echo "  make cov-all          - 完整覆盖率流程"
+	@echo "  make trace && make wave - 生成并查看波形"

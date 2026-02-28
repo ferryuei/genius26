@@ -1,0 +1,53 @@
+# Yosys Synthesis Script for L2 Switch Core
+# Yosys has limited SV package support, read all files together
+
+# Read all files in one go for package resolution
+read_verilog -sv \
+    ../rtl/switch_pkg.sv \
+    ../rtl/cell_allocator.sv \
+    ../rtl/packet_buffer.sv \
+    ../rtl/mac_table.sv \
+    ../rtl/acl_engine.sv \
+    ../rtl/ingress_pipeline.sv \
+    ../rtl/egress_scheduler.sv \
+    ../rtl/lag_engine.sv \
+    ../rtl/igmp_snooping.sv \
+    ../rtl/port_statistics.sv \
+    ../rtl/pause_frame_ctrl.sv \
+    ../rtl/egress_output_ctrl.sv \
+    ../rtl/switch_core.sv
+
+# Hierarchy check
+hierarchy -check -top switch_core
+
+# Report initial design statistics
+tee -o initial_stats.txt stat
+
+# High-level synthesis passes
+proc; opt
+fsm; opt
+memory -nomap; opt
+
+# Technology mapping
+techmap; opt
+
+# Logic optimization with ABC
+abc -g AND,OR,XOR -fast
+
+# Final cleanup
+opt_clean
+
+# Generate detailed statistics
+tee -o synthesis_stats.txt stat
+
+# Write reports
+tee -o hierarchy_report.txt hierarchy
+
+# Check for errors/warnings
+check
+
+# Write outputs
+write_verilog -noattr switch_core_syn.v
+write_json switch_core_syn.json
+
+echo "=== Synthesis Complete ==="
