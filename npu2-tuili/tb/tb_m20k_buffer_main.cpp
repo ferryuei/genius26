@@ -1,4 +1,4 @@
-// Verilator C++ wrapper with proper initialization
+// Verilator C++ wrapper with proper clock driving
 #include "Vtb_m20k_buffer.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
@@ -18,14 +18,32 @@ int main(int argc, char** argv) {
     // Initialize trace (always enable for debugging)
     VerilatedVcdC* tfp = new VerilatedVcdC;
     top->trace(tfp, 99);
-    tfp->open("run/waves/tb_m20k_buffer.vcd");
+    tfp->open("waves/tb_m20k_buffer.vcd");
     
-    // Run simulation
+    // Run simulation with clock driving
     vluint64_t sim_time = 0;
-    while (!Verilated::gotFinish() && sim_time < 500000) {
+    const vluint64_t max_sim_time = 1000000; // 1M time units
+    
+    while (!Verilated::gotFinish() && sim_time < max_sim_time) {
+        // Toggle clock every time unit
+        if ((sim_time % 2) == 0) {
+            top->clk = 0;
+        } else {
+            top->clk = 1;
+        }
+        
+        // Evaluate model
         top->eval();
+        
+        // Dump trace
         tfp->dump(sim_time);
+        
         sim_time++;
+    }
+    
+    // Check if simulation finished normally
+    if (!Verilated::gotFinish()) {
+        std::cout << "\nWARNING: Simulation reached maximum time without $finish\n";
     }
     
     // Cleanup

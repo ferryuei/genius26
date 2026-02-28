@@ -9,8 +9,13 @@
 
 ### 核心特性
 
-- **4个Systolic Array**: 96×96 PEs,共36,864处理单元
-- **混合精度**: INT8 (22 TOPS) / BF16 (5.5 TFLOPS)
+- **4个Systolic Array**: 默认96×96 PEs(可配置24/48/64/96),共36,864处理单元(满配)
+- **混合精度**: INT8 / BF16 双精度支持
+- **可配置算力**:
+  - 24×24: INT8 2.76 TOPS / BF16 2.76 TFLOPS (快速仿真)
+  - 48×48: INT8 11.06 TOPS / BF16 11.06 TFLOPS (推荐调试)
+  - 64×64: INT8 19.66 TOPS / BF16 19.66 TFLOPS (较大规模)
+  - 96×96: INT8 44.24 TOPS / BF16 44.24 TFLOPS (完整规模,有效算力约22 TOPS)
 - **大容量片上存储**: 228MB M20K缓存
 - **高速接口**: 48通道 @ 17.4Gbps (103 GB/s)
 - **DDR4内存**: 4通道,64GB容量
@@ -136,10 +141,11 @@ gtkwave run/waves/tb_vp_pe.vcd &
 - **资源**: 1 DSP块 + 寄存器
 
 #### 2. Systolic Array (systolic_array.v)
-- **规模**: 96×96 = 9,216 PEs
+- **规模**: 可配置 24×24 / 48×48 / 64×64 / 96×96
 - **架构**: Weight Stationary
-- **性能**: INT8 18K ops/cycle, BF16 9K ops/cycle
+- **性能** (96×96配置): INT8 18K ops/cycle, BF16 9K ops/cycle
 - **状态**: IDLE → LOAD_W → COMPUTE → DRAIN
+- **说明**: 通过修改`ARRAY_SIZE`参数可调整阵列规模,降低仿真复杂度
 
 #### 3. M20K Buffer (m20k_buffer.v)
 - **类型**: True Dual-Port
@@ -280,9 +286,20 @@ set_global_assignment -name OPTIMIZATION_TECHNIQUE SPEED
 
 ### 预期性能
 
-- **INT8**: 22 TOPS @ 600MHz
-- **BF16**: 5.5 TFLOPS @ 600MHz
+**完整配置 (96×96 PE阵列)**:
+- **INT8理论峰值**: 44.24 TOPS @ 600MHz
+- **INT8有效算力**: ~22 TOPS (考虑40-50%访存效率)
+- **BF16理论峰值**: 44.24 TFLOPS @ 600MHz  
+- **BF16有效算力**: ~5.5 TFLOPS (考虑约20%访存效率)
 - **功耗**: ~90W (典型)
+
+**可配置规模对应算力**:
+| 配置 | 理论峰值(INT8) | 有效算力(INT8) | 适用场景 |
+|------|--------------|--------------|---------|
+| 24×24 | 2.76 TOPS | ~1.4 TOPS | 快速仿真 |
+| 48×48 | 11.06 TOPS | ~5.5 TOPS | 推荐调试 |
+| 64×64 | 19.66 TOPS | ~9.8 TOPS | 较大规模 |
+| 96×96 | 44.24 TOPS | ~22 TOPS | 完整规模 |
 
 ---
 

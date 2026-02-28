@@ -23,6 +23,7 @@ module dma_engine #(
     input  wire [ADDR_WIDTH-1:0]            dst_addr,
     input  wire [31:0]                      length,         // Transfer length in bytes
     input  wire                             start,
+    input  wire                             write_mode,     // 0=read from DDR, 1=write to DDR
     output reg                              done,
     
     // DDR4 Avalon-MM Master Interface
@@ -36,10 +37,15 @@ module dma_engine #(
     input  wire                             avmm_waitrequest,
     output reg  [7:0]                       avmm_burstcount,
     
-    // Internal Stream Interface (to fabric)
-    output wire [DATA_WIDTH-1:0]            stream_data,
-    output wire                             stream_valid,
-    input  wire                             stream_ready
+    // Read Stream Interface (from DDR to fabric)
+    output wire [DATA_WIDTH-1:0]            stream_rd_data,
+    output wire                             stream_rd_valid,
+    input  wire                             stream_rd_ready,
+    
+    // Write Stream Interface (from fabric to DDR)
+    input  wire [DATA_WIDTH-1:0]            stream_wr_data,
+    input  wire                             stream_wr_valid,
+    output reg                              stream_wr_ready
 );
 
     //==========================================================================
@@ -51,7 +57,8 @@ module dma_engine #(
     localparam READ_DATA    = 3'b010;
     localparam WRITE_REQ    = 3'b011;
     localparam WRITE_DATA   = 3'b100;
-    localparam DONE_STATE   = 3'b101;
+    localparam WRITE_WAIT   = 3'b101;
+    localparam DONE_STATE   = 3'b110;
     
     reg [2:0]               state;
     
@@ -64,6 +71,7 @@ module dma_engine #(
     reg [31:0]              bytes_transferred;
     reg [7:0]               burst_count;
     reg [7:0]               burst_remaining;
+    reg                     dma_mode;           // Latched write_mode
     
     // FIFO for read data buffering
     reg [DDR_DATA_WIDTH-1:0] read_fifo [0:15];
@@ -75,6 +83,13 @@ module dma_engine #(
     
     assign fifo_empty = (fifo_count == 5'd0);
     assign fifo_full = (fifo_count == 5'd16);
+    
+    // Write data buffering
+    reg [DDR_DATA_WIDTH-1:0] write_buffer;
+    reg [5:0]               write_word_count;   // Count 32-bit words (max 16 for 512-bit)
+    wire                    write_buffer_full;
+    
+    assign write_buffer_full = (write_word_count >= (DDR_DATA_WIDTH / DATA_WIDTH));
     
     //==========================================================================
     // Control FSM
@@ -95,15 +110,32 @@ module dma_engine #(
             avmm_byteenable <= {DDR_DATA_WIDTH/8{1'b1}};
             burst_count <= 8'd0;
             burst_remaining <= 8'd0;
+            dma_mode <= 1'b0;
+            stream_wr_ready <= 1'b0;
+            write_buffer <= {DDR_DATA_WIDTH{1'b0}};
+            write_word_count <= 6'd0;
         end else begin
             case (state)
                 IDLE: begin
                     done <= 1'b0;
+                    stream_wr_ready <= 1'b0;
+                    
                     if (start) begin
-                        current_addr <= src_addr;
+                        dma_mode <= write_mode;
                         bytes_remaining <= length;
                         bytes_transferred <= 32'd0;
-                        state <= READ_REQ;
+                        write_word_count <= 6'd0;
+                        
+                        if (write_mode) begin
+                            // Write mode: from fabric to DDR
+                            current_addr <= dst_addr;
+                            stream_wr_ready <= 1'b1;
+                            state <= WRITE_REQ;
+                        end else begin
+                            // Read mode: from DDR to fabric
+                            current_addr <= src_addr;
+                            state <= READ_REQ;
+                        end
                     end
                 end
                 
@@ -153,16 +185,60 @@ module dma_engine #(
                 end
                 
                 WRITE_REQ: begin
-                    // Simplified: not implemented in this version
-                    state <= IDLE;
+                    // Accumulate 32-bit words into 512-bit buffer
+                    if (stream_wr_valid && stream_wr_ready) begin
+                        // Pack DATA_WIDTH data into DDR_DATA_WIDTH buffer
+                        write_buffer[write_word_count * DATA_WIDTH +: DATA_WIDTH] <= stream_wr_data;
+                        write_word_count <= write_word_count + 1'b1;
+                        
+                        // When buffer is full, proceed to write
+                        if (write_buffer_full || (bytes_remaining <= (DATA_WIDTH/8))) begin
+                            stream_wr_ready <= 1'b0;
+                            
+                            // Calculate burst (simplified: single beat for now)
+                            burst_count <= 8'd1;
+                            burst_remaining <= 8'd1;
+                            state <= WRITE_DATA;
+                        end
+                    end
                 end
                 
                 WRITE_DATA: begin
-                    state <= IDLE;
+                    if (!avmm_waitrequest) begin
+                        // Issue write request
+                        avmm_address <= current_addr;
+                        avmm_write <= 1'b1;
+                        avmm_writedata <= write_buffer;
+                        avmm_burstcount <= burst_count;
+                        avmm_byteenable <= {DDR_DATA_WIDTH/8{1'b1}};
+                        
+                        bytes_transferred <= bytes_transferred + (DDR_DATA_WIDTH/8);
+                        current_addr <= current_addr + (DDR_DATA_WIDTH/8);
+                        bytes_remaining <= bytes_remaining - (DDR_DATA_WIDTH/8);
+                        
+                        // Clear buffer
+                        write_buffer <= {DDR_DATA_WIDTH{1'b0}};
+                        write_word_count <= 6'd0;
+                        
+                        state <= WRITE_WAIT;
+                    end
+                end
+                
+                WRITE_WAIT: begin
+                    avmm_write <= 1'b0;
+                    
+                    // Check if more data to write
+                    if (bytes_remaining > 0) begin
+                        stream_wr_ready <= 1'b1;
+                        state <= WRITE_REQ;
+                    end else begin
+                        state <= DONE_STATE;
+                    end
                 end
                 
                 DONE_STATE: begin
                     done <= 1'b1;
+                    stream_wr_ready <= 1'b0;
                     state <= IDLE;
                 end
                 
@@ -178,10 +254,8 @@ module dma_engine #(
     always @(posedge clk) begin
         if (!rst_n) begin
             fifo_count <= 5'd0;
-            fifo_wr_ptr <= 4'd0;
-            fifo_rd_ptr <= 4'd0;
         end else begin
-            case ({avmm_readdatavalid && !fifo_full, stream_valid && stream_ready})
+            case ({avmm_readdatavalid && !fifo_full, stream_rd_valid && stream_rd_ready})
                 2'b10: fifo_count <= fifo_count + 1'b1;  // Write only
                 2'b01: fifo_count <= fifo_count - 1'b1;  // Read only
                 2'b11: fifo_count <= fifo_count;         // Both
@@ -191,7 +265,7 @@ module dma_engine #(
     end
     
     //==========================================================================
-    // Stream Output (FIFO Read)
+    // Stream Output (FIFO Read) - for read mode
     //==========================================================================
     
     reg [DDR_DATA_WIDTH-1:0] stream_data_reg;
@@ -201,8 +275,9 @@ module dma_engine #(
         if (!rst_n) begin
             stream_data_reg <= {DDR_DATA_WIDTH{1'b0}};
             stream_valid_reg <= 1'b0;
+            fifo_rd_ptr <= 4'd0;
         end else begin
-            if (!fifo_empty && stream_ready) begin
+            if (!fifo_empty && stream_rd_ready) begin
                 stream_data_reg <= read_fifo[fifo_rd_ptr];
                 stream_valid_reg <= 1'b1;
                 fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
@@ -213,7 +288,7 @@ module dma_engine #(
     end
     
     // Data width conversion (512-bit to 32-bit)
-    assign stream_data = stream_data_reg[DATA_WIDTH-1:0];
-    assign stream_valid = stream_valid_reg;
+    assign stream_rd_data = stream_data_reg[DATA_WIDTH-1:0];
+    assign stream_rd_valid = stream_valid_reg;
 
 endmodule

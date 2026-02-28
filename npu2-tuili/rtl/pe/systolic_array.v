@@ -76,7 +76,7 @@ module systolic_array #(
             state           <= IDLE;
             done            <= 1'b0;
             cycle_count     <= 16'd0;
-            compute_cycles  <= 16'd96;  // Default for 96x96
+            compute_cycles  <= ARRAY_SIZE;  // Configurable based on array size
             pe_enable       <= 1'b0;
             accumulate_mode <= 1'b0;
             weight_load_addr<= {WEIGHT_ADDR_WIDTH{1'b0}};
