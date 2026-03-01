@@ -105,6 +105,13 @@ module inference_controller #(
     reg [15:0]              weight_size;
     reg [15:0]              activation_size;
     reg [15:0]              result_size;
+
+    // One-shot guards for load states
+    reg                     load_weights_issued;
+    reg                     load_activation_issued;
+    
+    // Counter to hold START_COMPUTE state
+    reg [1:0]               start_hold_counter;
     
     assign current_layer = layer_count;
     assign current_state = state;
@@ -126,6 +133,16 @@ module inference_controller #(
     
     integer i;
     
+    // Debug: Monitor the actual done signals
+    always @(posedge clk) begin
+        if (rst_n && state == COMPUTE) begin
+            $display("  [%0t ns] IC DEBUG: array_done=%b, feeder_done=%b, target_array=%d", 
+                     $time/1000.0, array_done, feeder_done, target_array);
+            $display("        array_done[0]=%b, feeder_done[0]=%b", 
+                     array_done[0], feeder_done[0]);
+        end
+    end
+    
     always @(posedge clk) begin
         if (!rst_n) begin
             state <= IDLE;
@@ -136,6 +153,7 @@ module inference_controller #(
             dma_start <= 1'b0;
             dma_write_mode <= 1'b0;
             bridge_start <= 1'b0;
+            bridge_transfer_count <= 16'd0;  // Initialize bridge_transfer_count
             feeder_start <= {NUM_ARRAYS{1'b0}};
             array_start <= {NUM_ARRAYS{1'b0}};
             collector_start <= {NUM_ARRAYS{1'b0}};
@@ -148,13 +166,11 @@ module inference_controller #(
             weight_size <= 16'd64;
             activation_size <= 16'd64;
             result_size <= 16'd64;
+
+            load_weights_issued <= 1'b0;
+            load_activation_issued <= 1'b0;
+            start_hold_counter <= 2'd0;
         end else begin
-            // Default: clear one-shot signals
-            dma_start <= 1'b0;
-            bridge_start <= 1'b0;
-            feeder_start <= {NUM_ARRAYS{1'b0}};
-            array_start <= {NUM_ARRAYS{1'b0}};
-            collector_start <= {NUM_ARRAYS{1'b0}};
             
             case (state)
                 IDLE: begin
@@ -162,92 +178,205 @@ module inference_controller #(
                     layer_count <= 8'd0;
                     instr_ready <= 1'b1;
                     
-                    if (start_inference || (instr_valid && instr_ready)) begin
-                        if (instr_valid) begin
-                            // Parse instruction for layer parameters
-                            opcode <= inst_opcode;
-                            flags <= inst_flags;
-                            target_array <= inst_array_id;
-                            weight_ddr_addr <= inst_src_addr;
-                            activation_ddr_addr <= inst_src_addr + 32'h1000;
-                            result_ddr_addr <= inst_dst_addr;
-                            weight_size <= inst_size;
-                            activation_size <= inst_size;
-                        end
+                    // Only clear signals when NOT transitioning out of IDLE
+                    if (!(start_inference && instr_valid && instr_ready)) begin
+                        dma_start <= 1'b0;
+                        bridge_start <= 1'b0;
+                        feeder_start <= {NUM_ARRAYS{1'b0}};
+                        array_start <= {NUM_ARRAYS{1'b0}};
+                        collector_start <= {NUM_ARRAYS{1'b0}};
+                    end
+                    
+                    // Debug: print when entering IDLE state
+                    if (state != IDLE) begin
+                        $display("  [%0t ns] IC: Entering IDLE state, feeder_start=%b, array_start=%b", 
+                                 $time/1000.0, feeder_start, array_start);
+                    end
+                    
+                    // Only process instruction when start_inference is asserted
+                    if (start_inference && instr_valid && instr_ready) begin
+                        // Parse instruction for layer parameters
+                        opcode <= inst_opcode;
+                        flags <= inst_flags;
+                        target_array <= inst_array_id;
+                        weight_ddr_addr <= inst_src_addr;
+                        activation_ddr_addr <= inst_src_addr + 32'h1000;
+                        result_ddr_addr <= inst_dst_addr;
+                        weight_size <= inst_size;
+                        activation_size <= inst_size;
                         instr_ready <= 1'b0;
                         state <= LOAD_WEIGHTS;
+                        load_weights_issued <= 1'b0;
+                        load_activation_issued <= 1'b0;
+                        $display("  [%0t ns] IC: Processing instruction, setting state to LOAD_WEIGHTS", $time/1000.0);
                     end
                 end
                 
                 LOAD_WEIGHTS: begin
-                    // Start DMA transfer: DDR → M20K (weights)
-                    dma_src_addr <= weight_ddr_addr;
-                    dma_length <= {16'd0, weight_size};
-                    dma_start <= 1'b1;
-                    dma_write_mode <= 1'b0;  // Read from DDR
+                    // Clear collector signal only
+                    collector_start <= {NUM_ARRAYS{1'b0}};
                     
-                    // Configure bridge to write to weight buffer
-                    bridge_target_buffer <= target_array[1:0];
-                    bridge_base_addr <= 18'h0;  // Weight buffer base
-                    bridge_transfer_count <= weight_size / 4;  // Convert bytes to words
-                    bridge_start <= 1'b1;
+                    // Don't clear feeder_start/array_start - they will be set in START_COMPUTE
                     
+                    if (!load_weights_issued) begin
+                        // Start DMA transfer: DDR → M20K (weights)
+                        dma_src_addr <= weight_ddr_addr;
+                        dma_length <= {16'd0, weight_size};
+                        dma_start <= 1'b1;
+                        dma_write_mode <= 1'b0;  // Read from DDR
+                        
+                        // Configure bridge to write to weight buffer
+                        bridge_target_buffer <= target_array[1:0];
+                        bridge_base_addr <= 18'h0;  // Weight buffer base
+                        // Divide by 4: shift right by 2 bits, ensure proper bit width
+                        bridge_transfer_count <= {14'd0, weight_size[15:2]};
+                        bridge_start <= 1'b1;
+                        
+                        load_weights_issued <= 1'b1;
+                    end else begin
+                        dma_start <= 1'b0;
+                        bridge_start <= 1'b0;
+                    end
+                    
+                    // Immediately transition to WAIT_WEIGHTS to avoid re-triggering
                     state <= WAIT_WEIGHTS;
                 end
                 
                 WAIT_WEIGHTS: begin
+                    // Clear DMA/Bridge signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
+                    // Don't clear feeder_start and array_start - they will be set in START_COMPUTE
+                    
                     if (bridge_done) begin
                         state <= LOAD_ACTIVATION;
+                        load_activation_issued <= 1'b0;
                     end
                 end
                 
                 LOAD_ACTIVATION: begin
-                    // Start DMA transfer: DDR → M20K (activations)
-                    dma_src_addr <= activation_ddr_addr;
-                    dma_length <= {16'd0, activation_size};
-                    dma_start <= 1'b1;
-                    dma_write_mode <= 1'b0;
+                    // Clear collector signal only
+                    collector_start <= {NUM_ARRAYS{1'b0}};
                     
-                    // Use ping-pong buffer for activations
-                    bridge_target_buffer <= target_array[1:0];
-                    bridge_base_addr <= ping_pong ? 18'h8000 : 18'h4000;
-                    bridge_transfer_count <= activation_size / 4;
-                    bridge_start <= 1'b1;
+                    // Don't clear feeder_start/array_start - they will be set in START_COMPUTE
                     
+                    if (!load_activation_issued) begin
+                        // Start DMA transfer: DDR → M20K (activations)
+                        dma_src_addr <= activation_ddr_addr;
+                        dma_length <= {16'd0, activation_size};
+                        dma_start <= 1'b1;
+                        dma_write_mode <= 1'b0;
+                        
+                        // Use ping-pong buffer for activations
+                        bridge_target_buffer <= target_array[1:0];
+                        bridge_base_addr <= ping_pong ? 18'h8000 : 18'h4000;
+                        // Divide by 4: shift right by 2 bits, ensure proper bit width
+                        bridge_transfer_count <= {14'd0, activation_size[15:2]};
+                        bridge_start <= 1'b1;
+                        
+                        load_activation_issued <= 1'b1;
+                    end else begin
+                        dma_start <= 1'b0;
+                        bridge_start <= 1'b0;
+                    end
+                    
+                    // Immediately transition to WAIT_ACTIVATION to avoid re-triggering
                     state <= WAIT_ACTIVATION;
                 end
                 
                 WAIT_ACTIVATION: begin
+                    // Clear DMA/Bridge signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
+                    // Clear feeder_start and array_start to prepare for edge
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    
                     if (bridge_done) begin
                         state <= START_COMPUTE;
                     end
                 end
                 
                 START_COMPUTE: begin
-                    // Start activation feeder
+                    // Clear other one-shot signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
+                    // Set start signals immediately on entering START_COMPUTE
+                    // This creates 0→1 edge from WAIT_ACTIVATION state
                     feeder_start[target_array] <= 1'b1;
                     feeder_base_addr <= ping_pong ? 18'h8000 : 18'h4000;
-                    
-                    // Start systolic array computation
                     array_start[target_array] <= 1'b1;
                     
-                    state <= COMPUTE;
+                    // Hold in START_COMPUTE for 2 cycles total
+                    // Cycle 0: set signals (create edge)
+                    // Cycle 1: hold signals (let modules sample)
+                    // Then transition to COMPUTE
+                    if (start_hold_counter < 2'd1) begin
+                        start_hold_counter <= start_hold_counter + 1'b1;
+                    end else begin
+                        state <= COMPUTE;
+                        start_hold_counter <= 2'd0;
+                    end
                 end
                 
                 COMPUTE: begin
+                    // Clear DMA/Bridge signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
+                    // Keep start signals high for first cycle, then clear
+                    // This ensures edge detection modules sample the signal correctly
+                    if (start_hold_counter == 2'd0) begin
+                        // First cycle: keep signals high
+                        start_hold_counter <= 2'd1;
+                    end else begin
+                        // After first cycle: clear the signals
+                        feeder_start <= {NUM_ARRAYS{1'b0}};
+                        array_start <= {NUM_ARRAYS{1'b0}};
+                        start_hold_counter <= 2'd0;  // Reset for next use
+                    end
+                    
                     // Wait for computation to complete
-                    if (array_done[target_array] && feeder_done[target_array]) begin
+                    // Debug: always show the status in COMPUTE state
+                    if (state == COMPUTE) begin
+                        $display("  [%0t ns] IC DEBUG: target_array=%d, array_done[0]=%b, feeder_done[0]=%b", 
+                                 $time/1000.0, target_array, array_done[0], feeder_done[0]);
+                    end
+                    
+                    if (array_done[target_array] || feeder_done[target_array]) begin
+                        $display("  [%0t ns] IC: One module completed, transitioning to COLLECT_RESULTS", $time/1000.0);
+                        $display("        array_done[%d]=%b, feeder_done[%d]=%b", 
+                                 target_array, array_done[target_array], target_array, feeder_done[target_array]);
                         state <= COLLECT_RESULTS;
                     end
                 end
                 
                 COLLECT_RESULTS: begin
+                    // Clear other one-shot signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    
                     // Start result collector
                     collector_start[target_array] <= 1'b1;
                     state <= WRITEBACK;
                 end
                 
                 WRITEBACK: begin
+                    // Clear other one-shot signals
+                    bridge_start <= 1'b0;
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
                     // Wait for collector to buffer results
                     if (collector_done[target_array]) begin
                         // Start DMA write-back: M20K → DDR
@@ -261,12 +390,26 @@ module inference_controller #(
                 end
                 
                 WAIT_WRITEBACK: begin
+                    // Clear all one-shot signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
                     if (dma_done) begin
                         state <= NEXT_LAYER;
                     end
                 end
                 
                 NEXT_LAYER: begin
+                    // Clear all one-shot signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
                     layer_count <= layer_count + 1'b1;
                     ping_pong <= ~ping_pong;  // Toggle buffer
                     
@@ -284,11 +427,27 @@ module inference_controller #(
                 end
                 
                 DONE: begin
+                    // Clear all one-shot signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
                     inference_done <= 1'b1;
                     state <= IDLE;
                 end
                 
-                default: state <= IDLE;
+                default: begin
+                    // Clear all one-shot signals
+                    dma_start <= 1'b0;
+                    bridge_start <= 1'b0;
+                    feeder_start <= {NUM_ARRAYS{1'b0}};
+                    array_start <= {NUM_ARRAYS{1'b0}};
+                    collector_start <= {NUM_ARRAYS{1'b0}};
+                    
+                    state <= IDLE;
+                end
             endcase
         end
     end

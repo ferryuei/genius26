@@ -19,7 +19,7 @@ module systolic_array #(
     
     // Control Signals
     input  wire                         start,
-    output reg                          done,
+    output reg                          done = 1'b0,          // 默认值0
     input  wire                         precision_mode,  // 0=INT8, 1=BF16
     
     // Weight Memory Interface
@@ -57,15 +57,15 @@ module systolic_array #(
     localparam COMPUTE  = 2'b10;
     localparam DRAIN    = 2'b11;
     
-    reg [1:0]               state;
-    reg [15:0]              cycle_count;
-    reg [15:0]              compute_cycles;
-    reg                     pe_enable;
-    reg                     accumulate_mode;
+    reg [1:0]               state = 2'b00;
+    reg [15:0]              cycle_count = 16'd0;
+    reg [15:0]              compute_cycles = 16'd0;
+    reg                     pe_enable = 1'b0;
+    reg                     accumulate_mode = 1'b0;
     
     // Weight Loading
-    reg [WEIGHT_ADDR_WIDTH-1:0] weight_load_addr;
-    reg                         weight_load_en;
+    reg [WEIGHT_ADDR_WIDTH-1:0] weight_load_addr = {WEIGHT_ADDR_WIDTH{1'b0}};
+    reg                         weight_load_en = 1'b0;
     
     //==========================================================================
     // Control FSM
@@ -74,7 +74,7 @@ module systolic_array #(
     always @(posedge clk) begin
         if (!rst_n) begin
             state           <= IDLE;
-            done            <= 1'b0;
+            // done already has default value 1'b0
             cycle_count     <= 16'd0;
             compute_cycles  <= ARRAY_SIZE;  // Configurable based on array size
             pe_enable       <= 1'b0;
@@ -86,7 +86,9 @@ module systolic_array #(
                 IDLE: begin
                     done <= 1'b0;
                     cycle_count <= 16'd0;
+                    // State-based trigger: only trigger when in IDLE state
                     if (start) begin
+                        $display("  [%0t ns] Systolic Array[%m]: START received, entering LOAD_W", $time/1000.0);
                         state <= LOAD_W;
                         weight_load_addr <= {WEIGHT_ADDR_WIDTH{1'b0}};
                         weight_load_en <= 1'b1;
@@ -97,6 +99,8 @@ module systolic_array #(
                     // Load weights into PE array (simplified - assumes pre-loaded)
                     weight_load_addr <= weight_load_addr + 1'b1;
                     if (weight_load_addr == (ARRAY_SIZE * ARRAY_SIZE - 1)) begin
+                        $display("  [%0t ns] Systolic Array[%m]: Weight loading complete (%d weights), entering COMPUTE", 
+                                 $time/1000.0, ARRAY_SIZE * ARRAY_SIZE);
                         state <= COMPUTE;
                         weight_load_en <= 1'b0;
                         pe_enable <= 1'b1;
@@ -109,6 +113,8 @@ module systolic_array #(
                     accumulate_mode <= 1'b1;
                     
                     if (cycle_count == compute_cycles) begin
+                        $display("  [%0t ns] Systolic Array[%m]: Compute complete (%d cycles), entering DRAIN", 
+                                 $time/1000.0, compute_cycles);
                         state <= DRAIN;
                         pe_enable <= 1'b0;
                         cycle_count <= 16'd0;
@@ -116,10 +122,16 @@ module systolic_array #(
                 end
                 
                 DRAIN: begin
-                    // Wait for pipeline to drain
+                    // Wait for pipeline to drain - keep PE enabled but stop new inputs
                     cycle_count <= cycle_count + 1'b1;
+                    accumulate_mode <= 1'b1;  // Keep accumulating existing data
+                    pe_enable <= 1'b1;        // Keep PE running to flush pipeline
+                    
                     if (cycle_count == ARRAY_SIZE + 16'd10) begin
+                        $display("  [%0t ns] Systolic Array[%m]: Pipeline drain complete, asserting DONE", 
+                                 $time/1000.0);
                         state <= IDLE;
+                        pe_enable <= 1'b0;    // Turn off PE after draining
                         done <= 1'b1;
                     end
                 end

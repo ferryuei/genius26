@@ -198,9 +198,14 @@ RTL_SOURCES = \
 	$(RTL_DIR)/memory/m20k_buffer.v \
 	$(RTL_DIR)/dma/dma_engine.v \
 	$(RTL_DIR)/control/control_unit.v \
-	$(RTL_DIR)/sfu/sfu_unit.v \
+	$(RTL_DIR)/datapath/inference_controller.v \
+	$(RTL_DIR)/datapath/dma_to_m20k_bridge.v \
+	$(RTL_DIR)/datapath/activation_feeder.v \
+	$(RTL_DIR)/datapath/result_collector.v \
+	$(RTL_DIR)/datapath/sfu_datapath_bridge.v \
+	$(RTL_DIR)/sfu/sfu_unit_enhanced.v \
 	$(RTL_DIR)/ip_models/intel_ip_models.v \
-	$(RTL_DIR)/top/npu_top.v
+	$(RTL_DIR)/top/npu_top_integrated.v
 
 ifeq ($(SIM),iverilog)
 # Icarus Verilog targets

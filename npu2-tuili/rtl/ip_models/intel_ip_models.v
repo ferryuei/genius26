@@ -68,7 +68,9 @@ module comm_interface #(
             instr_valid <= 1'b0;
         end else begin
             dma_start <= 1'b0;
-            instr_valid <= 1'b0;
+            
+            // Don't auto-clear instr_valid based on instr_ready
+            // Let it stay valid until a new instruction arrives
             
             if (xcvr_rx_valid && xcvr_rx_ready) begin
                 case (pkt_type)
@@ -80,7 +82,9 @@ module comm_interface #(
                     end
                     
                     PKT_TYPE_INSTR: begin
-                        instruction <= pkt_payload[INSTR_WIDTH-1:0];
+                        // Extract 256-bit instruction from payload
+                        // Payload bits [399:144] contain the instruction
+                        instruction <= pkt_payload[399:144];
                         instr_valid <= 1'b1;
                     end
                     

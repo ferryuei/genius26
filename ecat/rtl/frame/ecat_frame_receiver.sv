@@ -36,6 +36,15 @@ module ecat_frame_receiver #(
     output reg                      mem_rd_en,
     input  wire [15:0]              mem_rdata,
     input  wire                     mem_ready,
+
+    // Logical access interface (FMMU translated)
+    output reg                      log_req,
+    output reg                      log_wr,
+    output reg  [31:0]              log_addr,
+    output reg  [7:0]               log_wdata,
+    input  wire                     log_ack,
+    input  wire [7:0]               log_rdata,
+    input  wire                     log_err,
     
     // Frame forwarding
     output reg                      fwd_valid,
@@ -43,6 +52,13 @@ module ecat_frame_receiver #(
     output reg                      fwd_sof,
     output reg                      fwd_eof,
     output reg                      fwd_modified,
+
+    // Frame metadata for port controller
+    output reg                      frame_rx_valid,
+    output reg  [47:0]              frame_src_mac,
+    output reg  [47:0]              frame_dst_mac,
+    output reg                      frame_is_ecat,
+    output reg                      frame_crc_error,
     
     // Statistics
     output reg  [15:0]              rx_frame_count,
@@ -111,6 +127,7 @@ module ecat_frame_receiver #(
     reg         is_write_cmd;
     reg         is_rw_cmd;
     reg         crc_err;
+    wire        is_log_cmd = (dg_cmd == CMD_LRD || dg_cmd == CMD_LWR || dg_cmd == CMD_LRW);
     
     // CRC32 validation
     reg [31:0]  crc_accumulator;
@@ -126,8 +143,9 @@ module ecat_frame_receiver #(
     reg [10:0]  data_idx;
     
     // Write buffer - simple fixed-size buffer
-    reg [15:0]  wr_addr [0:31];
+    reg [31:0]  wr_addr [0:31];
     reg [7:0]   wr_data [0:31];
+    reg         wr_is_logical [0:31];
     reg [5:0]   wr_cnt;
     reg [5:0]   wr_idx;
 
@@ -265,6 +283,15 @@ module ecat_frame_receiver #(
             mem_be <= 0;
             mem_wr_en <= 0;
             mem_rd_en <= 0;
+            log_req <= 0;
+            log_wr <= 0;
+            log_addr <= 0;
+            log_wdata <= 0;
+            frame_rx_valid <= 0;
+            frame_src_mac <= 48'h0;
+            frame_dst_mac <= 48'h0;
+            frame_is_ecat <= 1'b0;
+            frame_crc_error <= 1'b0;
             rx_frame_count <= 0;
             rx_error_count <= 0;
             rx_crc_error_count <= 0;
@@ -276,6 +303,9 @@ module ecat_frame_receiver #(
             fwd_eof <= 0;
             mem_wr_en <= 0;
             mem_rd_en <= 0;
+            log_req <= 0;
+            log_wr <= 0;
+            frame_rx_valid <= 0;
             
             case (state)
                 // ============================================================
@@ -295,6 +325,8 @@ module ecat_frame_receiver #(
                         ethertype <= 0;
                         wr_cnt <= 0;
                         wr_idx <= 0;
+                        frame_is_ecat <= 1'b0;
+                        frame_crc_error <= 1'b0;
                     end
                 end
                 
@@ -309,6 +341,13 @@ module ecat_frame_receiver #(
                         // Accumulate CRC for all bytes
                         crc_accumulator <= crc32_byte(crc_accumulator, rx_data);
                         total_byte_cnt <= total_byte_cnt + 1;
+
+                        // Capture MAC addresses
+                        if (byte_cnt <= 5) begin
+                            frame_dst_mac <= {frame_dst_mac[39:0], rx_data};
+                        end else if (byte_cnt <= 11) begin
+                            frame_src_mac <= {frame_src_mac[39:0], rx_data};
+                        end
                         
                         if (byte_cnt == 12) ethertype[15:8] <= rx_data;
                         if (byte_cnt == 13) ethertype[7:0] <= rx_data;
@@ -316,6 +355,7 @@ module ecat_frame_receiver #(
                         if (byte_cnt == 13) begin
                             if ({ethertype[15:8], rx_data} == ETHERTYPE_ECAT) begin
                                 state <= S_ECAT_HDR;
+                                frame_is_ecat <= 1'b1;
                                 byte_cnt <= 0;
                             end else begin
                                 state <= S_TRANSPARENT;
@@ -328,6 +368,8 @@ module ecat_frame_receiver #(
                     if (rx_eof) begin
                         state <= S_IDLE;
                         rx_frame_count <= rx_frame_count + 1;
+                        frame_rx_valid <= 1'b1;
+                        frame_crc_error <= crc_err;
                     end
                 end
                 
@@ -355,6 +397,8 @@ module ecat_frame_receiver #(
                     if (rx_eof) begin
                         state <= S_IDLE;
                         rx_frame_count <= rx_frame_count + 1;
+                        frame_rx_valid <= 1'b1;
+                        frame_crc_error <= crc_err;
                     end
                 end
                 
@@ -410,6 +454,8 @@ module ecat_frame_receiver #(
                     if (rx_eof) begin
                         state <= S_IDLE;
                         rx_frame_count <= rx_frame_count + 1;
+                        frame_rx_valid <= 1'b1;
+                        frame_crc_error <= crc_err;
                     end
                 end
                 
@@ -426,8 +472,12 @@ module ecat_frame_receiver #(
                             // WRITE - buffer data for CRC-gated commit
                             if (is_write_cmd || is_rw_cmd) begin
                                 if (wr_cnt < 32) begin
-                                    wr_addr[wr_cnt] <= dg_ado + {5'b0, data_idx};
+                                    if (is_log_cmd)
+                                        wr_addr[wr_cnt] <= {dg_adp, dg_ado} + {21'b0, data_idx};
+                                    else
+                                        wr_addr[wr_cnt] <= {16'h0000, dg_ado} + {21'b0, data_idx};
                                     wr_data[wr_cnt] <= rx_data;
+                                    wr_is_logical[wr_cnt] <= is_log_cmd;
                                     wr_cnt <= wr_cnt + 1;
                                 end
                                 
@@ -440,8 +490,15 @@ module ecat_frame_receiver #(
                             
                             // READ - substitute from memory
                             if (is_read_cmd || is_rw_cmd) begin
-                                mem_addr <= dg_ado + {5'b0, data_idx};
-                                mem_rd_en <= mem_ready;
+                                if (is_log_cmd) begin
+                                    log_addr <= {dg_adp, dg_ado} + {21'b0, data_idx};
+                                    log_wr <= 1'b0;
+                                    log_wdata <= 8'h00;
+                                    log_req <= 1'b1;
+                                end else begin
+                                    mem_addr <= dg_ado + {5'b0, data_idx};
+                                    mem_rd_en <= mem_ready;
+                                end
                                 
                                 if (data_idx == 0) begin
                                     wkc_add <= is_rw_cmd ? 16'h0003 : 16'h0001;
@@ -454,7 +511,7 @@ module ecat_frame_receiver #(
                         // Forward
                         fwd_valid <= 1;
                         if (addr_matched && (is_read_cmd || is_rw_cmd) && !crc_err) begin
-                            fwd_data <= mem_rdata[7:0];
+                            fwd_data <= is_log_cmd ? log_rdata : mem_rdata[7:0];
                         end else begin
                             fwd_data <= rx_data;
                         end
@@ -578,11 +635,21 @@ module ecat_frame_receiver #(
                 S_COMMIT_WR: begin
                     // Commit buffered writes one at a time
                     if (wr_idx < wr_cnt) begin
-                        mem_addr <= wr_addr[wr_idx];
-                        mem_wdata <= {8'h00, wr_data[wr_idx]};
-                        mem_be <= 2'b01;
-                        mem_wr_en <= 1;
-                        wr_idx <= wr_idx + 1;
+                        if (wr_is_logical[wr_idx]) begin
+                            log_addr <= wr_addr[wr_idx];
+                            log_wr <= 1'b1;
+                            log_wdata <= wr_data[wr_idx];
+                            log_req <= 1'b1;
+                            if (log_ack) begin
+                                wr_idx <= wr_idx + 1;
+                            end
+                        end else begin
+                            mem_addr <= wr_addr[wr_idx][15:0];
+                            mem_wdata <= {8'h00, wr_data[wr_idx]};
+                            mem_be <= 2'b01;
+                            mem_wr_en <= 1;
+                            wr_idx <= wr_idx + 1;
+                        end
                     end else begin
                         state <= S_IDLE;
                         wr_cnt <= 0;
@@ -607,6 +674,8 @@ module ecat_frame_receiver #(
                             rx_error_count <= rx_error_count + 1;
                         end
                         state <= S_IDLE;
+                        frame_rx_valid <= 1'b1;
+                        frame_crc_error <= (crc_accumulator != 32'hC704DD7B);
                     end
                 end
                 

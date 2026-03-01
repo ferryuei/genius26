@@ -60,6 +60,20 @@ module npu_top_integrated #(
     // Internal Signals - DMA Engine
     //==========================================================================
     
+    // DMA signals from comm_interface (for direct DMA commands)
+    wire [ADDR_WIDTH-1:0]       dma_src_addr_comm;
+    wire [ADDR_WIDTH-1:0]       dma_dst_addr_comm;
+    wire [31:0]                 dma_length_comm;
+    wire                        dma_start_comm;
+    
+    // DMA signals from inference_controller
+    wire [ADDR_WIDTH-1:0]       dma_src_addr_infer;
+    wire [ADDR_WIDTH-1:0]       dma_dst_addr_infer;
+    wire [31:0]                 dma_length_infer;
+    wire                        dma_start_infer;
+    wire                        dma_write_mode_infer;
+    
+    // Multiplexed DMA signals to DMA engine
     wire [ADDR_WIDTH-1:0]       dma_src_addr;
     wire [ADDR_WIDTH-1:0]       dma_dst_addr;
     wire [31:0]                 dma_length;
@@ -94,7 +108,7 @@ module npu_top_integrated #(
     
     wire [M20K_ADDR_WIDTH-1:0]  m20k_waddr [NUM_ARRAYS-1:0];
     wire [DATA_WIDTH-1:0]       m20k_wdata [NUM_ARRAYS-1:0];
-    wire                        m20k_we    [NUM_ARRAYS-1:0];
+    wire [NUM_ARRAYS-1:0]       m20k_we;
     wire [M20K_ADDR_WIDTH-1:0]  m20k_raddr [NUM_ARRAYS-1:0];
     wire [DATA_WIDTH-1:0]       m20k_rdata [NUM_ARRAYS-1:0];
     wire                        m20k_re    [NUM_ARRAYS-1:0];
@@ -108,6 +122,9 @@ module npu_top_integrated #(
     wire [15:0]                 bridge_transfer_count;
     wire                        bridge_start;
     wire                        bridge_done;
+    wire [M20K_ADDR_WIDTH-1:0]  bridge_m20k_waddr [NUM_ARRAYS-1:0];
+    wire [DATA_WIDTH-1:0]       bridge_m20k_wdata [NUM_ARRAYS-1:0];
+    wire [NUM_ARRAYS-1:0]       bridge_m20k_we;
     
     //==========================================================================
     // Internal Signals - Activation Feeders
@@ -122,6 +139,15 @@ module npu_top_integrated #(
     wire [15:0]                 pe_bf16_a  [NUM_ARRAYS-1:0];
     wire [15:0]                 pe_bf16_w  [NUM_ARRAYS-1:0];
     wire                        feeder_data_valid [NUM_ARRAYS-1:0];
+    
+    //==========================================================================
+    // Internal Signals - Result Collector -> M20K
+    //==========================================================================
+    
+    wire [M20K_ADDR_WIDTH-1:0]  collector_m20k_waddr [NUM_ARRAYS-1:0];
+    wire [DATA_WIDTH-1:0]       collector_m20k_wdata [NUM_ARRAYS-1:0];
+    wire [NUM_ARRAYS-1:0]       collector_m20k_we;
+    reg  [NUM_ARRAYS-1:0]       collector_active;
     
     //==========================================================================
     // Internal Signals - Result Collectors
@@ -159,8 +185,21 @@ module npu_top_integrated #(
     // Multiplexing: Control Unit vs Inference Controller
     //==========================================================================
     
+    // Array start multiplexing
     wire [NUM_ARRAYS-1:0] array_start;
     assign array_start = start_inference ? array_start_infer : array_start_ctrl;
+    
+    // Instruction handshake multiplexing
+    wire instr_ready_infer;
+    wire instr_ready_ctrl;
+    assign instr_ready = start_inference ? instr_ready_infer : instr_ready_ctrl;
+    
+    // DMA control multiplexing
+    assign dma_src_addr = start_inference ? dma_src_addr_infer : dma_src_addr_comm;
+    assign dma_dst_addr = start_inference ? dma_dst_addr_infer : dma_dst_addr_comm;
+    assign dma_length = start_inference ? dma_length_infer : dma_length_comm;
+    assign dma_start = start_inference ? dma_start_infer : dma_start_comm;
+    assign dma_write_mode = start_inference ? dma_write_mode_infer : 1'b0;
     
     // Collector stream mux (simplified: use array 0 for now)
     assign dma_wr_data = collector_stream_data[0];
@@ -187,10 +226,10 @@ module npu_top_integrated #(
         .xcvr_tx_data       (xcvr_tx_data),
         .xcvr_tx_valid      (xcvr_tx_valid),
         .xcvr_tx_ready      (xcvr_tx_ready),
-        .dma_src_addr       (dma_src_addr),
-        .dma_dst_addr       (dma_dst_addr),
-        .dma_length         (dma_length),
-        .dma_start          (dma_start),
+        .dma_src_addr       (dma_src_addr_comm),
+        .dma_dst_addr       (dma_dst_addr_comm),
+        .dma_length         (dma_length_comm),
+        .dma_start          (dma_start_comm),
         .dma_done           (dma_done),
         .instruction        (instruction),
         .instr_valid        (instr_valid),
@@ -250,9 +289,9 @@ module npu_top_integrated #(
         .transfer_count     (bridge_transfer_count),
         .start              (bridge_start),
         .done               (bridge_done),
-        .m20k_waddr         (m20k_waddr),
-        .m20k_wdata         (m20k_wdata),
-        .m20k_we            (m20k_we)
+        .m20k_waddr         (bridge_m20k_waddr),
+        .m20k_wdata         (bridge_m20k_wdata),
+        .m20k_we            (bridge_m20k_we)
     );
     
     //==========================================================================
@@ -272,12 +311,12 @@ module npu_top_integrated #(
         .num_layers         (num_layers),
         .instruction        (instruction),
         .instr_valid        (instr_valid),
-        .instr_ready        (instr_ready),
-        .dma_src_addr       (dma_src_addr),
-        .dma_dst_addr       (dma_dst_addr),
-        .dma_length         (dma_length),
-        .dma_start          (dma_start),
-        .dma_write_mode     (dma_write_mode),
+        .instr_ready        (instr_ready_infer),
+        .dma_src_addr       (dma_src_addr_infer),
+        .dma_dst_addr       (dma_dst_addr_infer),
+        .dma_length         (dma_length_infer),
+        .dma_start          (dma_start_infer),
+        .dma_write_mode     (dma_write_mode_infer),
         .dma_done           (dma_done),
         .bridge_target_buffer   (bridge_target_buffer),
         .bridge_base_addr       (bridge_base_addr),
@@ -307,7 +346,7 @@ module npu_top_integrated #(
         .rst_n              (rst_n),
         .instruction        (instruction),
         .instr_valid        (instr_valid),
-        .instr_ready        (instr_ready),
+        .instr_ready        (instr_ready_ctrl),
         .array_start        (array_start_ctrl),
         .array_done         (array_done),
         .array_busy         (array_busy),
@@ -400,9 +439,9 @@ module npu_top_integrated #(
                 .precision_mode (precision_mode),
                 .pe_result      (pe_result[i]),
                 .pe_result_valid(pe_valid[i]),
-                .m20k_waddr     (m20k_waddr[i]),
-                .m20k_wdata     (m20k_wdata[i]),
-                .m20k_we        (m20k_we[i]),
+                .m20k_waddr     (collector_m20k_waddr[i]),
+                .m20k_wdata     (collector_m20k_wdata[i]),
+                .m20k_we        (collector_m20k_we[i]),
                 .stream_data    (collector_stream_data[i]),
                 .stream_valid   (collector_stream_valid[i]),
                 .stream_ready   (collector_stream_ready[i])
@@ -412,10 +451,10 @@ module npu_top_integrated #(
     endgenerate
     
     //==========================================================================
-    // Enhanced SFU
+    // Enhanced SFU (note: module name is 'sfu_unit', not 'sfu_unit_enhanced')
     //==========================================================================
     
-    sfu_unit_enhanced #(
+    sfu_unit #(
         .DATA_WIDTH         (DATA_WIDTH),
         .VECTOR_LEN         (VECTOR_LEN)
     ) u_sfu_unit (
@@ -426,11 +465,38 @@ module npu_top_integrated #(
         .gelu_start         (sfu_gelu_start),
         .done               (sfu_done),
         .precision_mode     (precision_mode),
-        .vector_length      (sfu_vector_length),
         .data_in            (sfu_data_in),
         .data_out           (sfu_data_out),
         .data_valid         (sfu_data_valid)
     );
+
+    //==========================================================================
+    // M20K Write Arbitration (Bridge vs Result Collector)
+    //==========================================================================
+    
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            collector_active <= {NUM_ARRAYS{1'b0}};
+        end else begin
+            for (int j = 0; j < NUM_ARRAYS; j = j + 1) begin
+                if (collector_start[j])
+                    collector_active[j] <= 1'b1;
+                else if (collector_done[j])
+                    collector_active[j] <= 1'b0;
+            end
+        end
+    end
+
+    generate
+        for (genvar k = 0; k < NUM_ARRAYS; k = k + 1) begin : gen_m20k_wr_mux
+            assign m20k_waddr[k] = collector_active[k] ? collector_m20k_waddr[k]
+                                                       : bridge_m20k_waddr[k];
+            assign m20k_wdata[k] = collector_active[k] ? collector_m20k_wdata[k]
+                                                       : bridge_m20k_wdata[k];
+            assign m20k_we[k]    = collector_active[k] ? collector_m20k_we[k]
+                                                       : bridge_m20k_we[k];
+        end
+    endgenerate
     
     //==========================================================================
     // Debug Status

@@ -105,6 +105,8 @@ module result_collector #(
                 COLLECT: begin
                     // Collect results from PE array
                     if (pe_result_valid && !fifo_full) begin
+                        $display("  [%0t ns] Result Collector[%m]: Got valid result 0x%h", 
+                                 $time/1000.0, pe_result);
                         // Store in FIFO
                         result_fifo[fifo_wr_ptr] <= pe_result;
                         
@@ -118,9 +120,14 @@ module result_collector #(
                         
                         // Check if all results collected
                         if (result_counter >= expected_results - 1) begin
+                            $display("  [%0t ns] Result Collector[%m]: All results collected, entering FLUSH", 
+                                     $time/1000.0);
                             state <= FLUSH;
                         end
                     end else begin
+                        if (pe_result_valid) begin
+                            $display("  [%0t ns] Result Collector[%m]: FIFO full, dropping result", $time/1000.0);
+                        end
                         m20k_we <= 1'b0;
                     end
                 end
@@ -129,7 +136,19 @@ module result_collector #(
                     // Wait for FIFO to be drained by DMA
                     m20k_we <= 1'b0;
                     
+                    $display("  [%0t ns] Result Collector[%m]: FLUSH state, fifo_empty=%b, fifo_count=%d, done=%b", 
+                             $time/1000.0, fifo_empty, fifo_count, done);
+                    
+                    // Force drain FIFO even if stream_ready is not asserted
+                    if (!fifo_empty) begin
+                        fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+                        fifo_count <= fifo_count - 1'b1;  // Must decrement count too!
+                        $display("  [%0t ns] Result Collector[%m]: Forcing FIFO drain, rd_ptr=%d, count=%d", 
+                                 $time/1000.0, fifo_rd_ptr, fifo_count);
+                    end
+                    
                     if (fifo_empty) begin
+                        $display("  [%0t ns] Result Collector[%m]: FIFO empty, asserting DONE", $time/1000.0);
                         done <= 1'b1;
                         state <= IDLE;
                     end

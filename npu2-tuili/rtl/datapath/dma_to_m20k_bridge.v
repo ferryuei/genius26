@@ -52,6 +52,7 @@ module dma_to_m20k_bridge #(
     reg [ADDR_WIDTH-1:0]    current_addr;
     reg [15:0]              words_remaining;
     reg [1:0]               active_buffer;
+    reg                     start_prev;  // Store previous start signal
     
     //==========================================================================
     // Control FSM
@@ -68,19 +69,24 @@ module dma_to_m20k_bridge #(
             words_remaining <= 16'd0;
             active_buffer <= 2'd0;
             m20k_we <= {NUM_BUFFERS{1'b0}};
+            start_prev <= 1'b0;
             
             for (i = 0; i < NUM_BUFFERS; i = i + 1) begin
                 m20k_waddr[i] <= {ADDR_WIDTH{1'b0}};
                 m20k_wdata[i] <= {DATA_WIDTH{1'b0}};
             end
         end else begin
+            // Capture previous start signal for edge detection
+            start_prev <= start;
+            
             case (state)
                 IDLE: begin
                     done <= 1'b0;
                     stream_ready <= 1'b0;
                     m20k_we <= {NUM_BUFFERS{1'b0}};
                     
-                    if (start) begin
+                    // Trigger only on rising edge of start signal
+                    if (start && !start_prev) begin
                         current_addr <= base_addr;
                         words_remaining <= transfer_count;
                         active_buffer <= target_buffer;
@@ -95,6 +101,9 @@ module dma_to_m20k_bridge #(
                         m20k_waddr[active_buffer] <= current_addr;
                         m20k_wdata[active_buffer] <= stream_data;
                         m20k_we[active_buffer] <= 1'b1;
+                        
+                        $display("  [%0t ns] Bridge: Writing to M20K buffer %d, addr 0x%h, data 0x%h", 
+                                 $time/1000.0, active_buffer, current_addr, stream_data);
                         
                         // Update counters
                         current_addr <= current_addr + 1'b1;

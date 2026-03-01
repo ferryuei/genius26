@@ -146,10 +146,16 @@ module npu_top #(
         .avmm_readdatavalid (ddr_avmm_readdatavalid),
         .avmm_waitrequest   (ddr_avmm_waitrequest),
         .avmm_burstcount    (ddr_avmm_burstcount),
-        // Internal Data Stream
-        .stream_data        (dma_rd_data),
-        .stream_valid       (dma_rd_valid),
-        .stream_ready       (dma_rd_ready)
+        // Internal Data Stream (Read Channel)
+        .stream_rd_data     (dma_rd_data),
+        .stream_rd_valid    (dma_rd_valid),
+        .stream_rd_ready    (dma_rd_ready),
+        // Internal Data Stream (Write Channel)
+        .stream_wr_data     ({DATA_WIDTH{1'b0}}),
+        .stream_wr_valid    (1'b0),
+        .stream_wr_ready    (),
+        // Control
+        .write_mode         (1'b0)
     );
     
     // Control Unit (Instruction Decoder & Scheduler)

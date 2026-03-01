@@ -19,21 +19,21 @@ module activation_feeder #(
     
     // Control Interface
     input  wire                         start,
-    output reg                          done,
+    output reg                          done = 1'b0,          // 默认值0
     input  wire                         precision_mode,  // 0=INT8, 1=BF16
     input  wire [ADDR_WIDTH-1:0]        base_addr,
     
     // M20K Read Interface
-    output reg  [ADDR_WIDTH-1:0]        m20k_raddr,
+    output reg  [ADDR_WIDTH-1:0]        m20k_raddr = {ADDR_WIDTH{1'b0}},
     input  wire [DATA_WIDTH-1:0]        m20k_rdata,
-    output reg                          m20k_re,
+    output reg                          m20k_re = 1'b0,
     
     // Systolic Array Input (broadcast to left edge)
-    output reg  [7:0]                   int8_a_out,
-    output reg  [7:0]                   int8_w_out,
-    output reg  [15:0]                  bf16_a_out,
-    output reg  [15:0]                  bf16_w_out,
-    output reg                          data_valid
+    output reg  [7:0]                   int8_a_out = 8'd0,
+    output reg  [7:0]                   int8_w_out = 8'd0,
+    output reg  [15:0]                  bf16_a_out = 16'd0,
+    output reg  [15:0]                  bf16_w_out = 16'd0,
+    output reg                          data_valid = 1'b0
 );
 
     //==========================================================================
@@ -45,17 +45,17 @@ module activation_feeder #(
     localparam READ_DATA    = 2'b10;
     localparam FEED_ARRAY   = 2'b11;
     
-    reg [1:0]   state;
+    reg [1:0]   state = 2'b00;
     
     //==========================================================================
     // Internal Registers
     //==========================================================================
     
-    reg [ADDR_WIDTH-1:0]    current_addr;
-    reg [15:0]              feed_counter;
-    reg [15:0]              total_cycles;
-    reg [DATA_WIDTH-1:0]    data_buffer;
-    reg [2:0]               byte_index;      // For INT8: 0-3 (4 bytes per word)
+    reg [ADDR_WIDTH-1:0]    current_addr = {ADDR_WIDTH{1'b0}};
+    reg [15:0]              feed_counter = 16'd0;
+    reg [15:0]              total_cycles = 16'd0;
+    reg [DATA_WIDTH-1:0]    data_buffer = 32'd0;
+    reg [2:0]               byte_index = 3'd0;      // For INT8: 0-3 (4 bytes per word)
     
     //==========================================================================
     // Control FSM
@@ -64,7 +64,7 @@ module activation_feeder #(
     always @(posedge clk) begin
         if (!rst_n) begin
             state <= IDLE;
-            done <= 1'b0;
+            // done already has default value 1'b0
             m20k_raddr <= {ADDR_WIDTH{1'b0}};
             m20k_re <= 1'b0;
             current_addr <= {ADDR_WIDTH{1'b0}};
@@ -84,10 +84,12 @@ module activation_feeder #(
                     data_valid <= 1'b0;
                     m20k_re <= 1'b0;
                     
+                    // State-based trigger: respond directly to start signal
                     if (start) begin
+                        $display("  [%0t ns] Activation Feeder[%m]: START received, total_cycles=%d", 
+                                 $time/1000.0, ARRAY_SIZE);
                         current_addr <= base_addr;
                         feed_counter <= 16'd0;
-                        // Total cycles = ARRAY_SIZE for feeding one column
                         total_cycles <= ARRAY_SIZE;
                         byte_index <= 3'd0;
                         state <= READ_ADDR;
@@ -104,6 +106,10 @@ module activation_feeder #(
                 READ_DATA: begin
                     // Wait one cycle for M20K read latency
                     m20k_re <= 1'b0;
+                    if (m20k_rdata !== 32'd0) begin
+                        $display("  [%0t ns] Activation Feeder[%m]: Got data from M20K: 0x%h", 
+                                 $time/1000.0, m20k_rdata);
+                    end
                     data_buffer <= m20k_rdata;
                     state <= FEED_ARRAY;
                 end
@@ -166,6 +172,8 @@ module activation_feeder #(
                     // Check if feeding is complete
                     feed_counter <= feed_counter + 1'b1;
                     if (feed_counter >= total_cycles - 1) begin
+                        $display("  [%0t ns] Activation Feeder[%m]: Feeding complete (%d cycles), asserting DONE", 
+                                 $time/1000.0, total_cycles);
                         data_valid <= 1'b0;
                         done <= 1'b1;
                         state <= IDLE;

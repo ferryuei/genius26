@@ -52,7 +52,7 @@ module ecat_sync_manager #(
     // Status and events
     output reg                      sm_active,        // SM is active
     output reg                      sm_irq,           // Interrupt request
-    output reg  [2:0]               sm_status         // Status code
+    output reg  [7:0]               sm_status         // Status register
 );
 
     // ========================================================================
@@ -512,9 +512,7 @@ module ecat_sync_manager #(
     
     // Status output
     always_comb begin
-        sm_status[0] = sm_enable;
-        sm_status[1] = buffer_swap_pending;
-        sm_status[2] = sm_irq;
+        sm_status = status;
     end
 
 endmodule
@@ -553,6 +551,7 @@ module ecat_sync_manager_array #(
     input  wire                     pdi_wr,
     input  wire [ADDR_WIDTH-1:0]    pdi_addr,
     input  wire [DATA_WIDTH-1:0]    pdi_wdata,
+    input  wire [2:0]               pdi_sm_sel,
     output wire                     pdi_ack,
     output reg  [DATA_WIDTH-1:0]    pdi_rdata,
     
@@ -565,7 +564,10 @@ module ecat_sync_manager_array #(
     input  wire [DATA_WIDTH-1:0]    mem_rdata,
     
     // Interrupt outputs
-    output wire [NUM_SM-1:0]        sm_irq
+    output wire [NUM_SM-1:0]        sm_irq,
+    output wire [NUM_SM*8-1:0]      sm_status_packed,
+    output wire [NUM_SM-1:0]        sm_active_bits,
+    input  wire [2:0]               ecat_sm_sel
 );
 
     // SM instance signals
@@ -579,6 +581,7 @@ module ecat_sync_manager_array #(
     wire [DATA_WIDTH-1:0] sm_ecat_rdata [NUM_SM-1:0];
     wire [DATA_WIDTH-1:0] sm_pdi_rdata [NUM_SM-1:0];
     wire [15:0] sm_cfg_rdata [NUM_SM-1:0];
+    wire [7:0] sm_status [NUM_SM-1:0];
     
     // Determine which SM should handle the request
     reg [3:0] active_sm_ecat, active_sm_pdi, active_sm_mem;
@@ -615,22 +618,28 @@ module ecat_sync_manager_array #(
                 .mem_wr(sm_mem_wr[i]),
                 .mem_addr(sm_mem_addr[i]),
                 .mem_wdata(sm_mem_wdata[i]),
-                .mem_ack(mem_ack && sm_active[i]),
+                .mem_ack(mem_ack && (active_sm_mem == i)),
                 .mem_rdata(mem_rdata),
                 .sm_active(sm_active[i]),
                 .sm_irq(sm_irq[i]),
-                .sm_status()
+                .sm_status(sm_status[i])
             );
         end
     endgenerate
     
     // SM selection logic (priority-based)
+    always_comb begin
+        active_sm_ecat = ecat_sm_sel;
+        active_sm_pdi = pdi_sm_sel;
+    end
+
+    // Memory port arbitration (first SM with mem_req)
     reg found_active;
     always_comb begin
         active_sm_mem = 0;
         found_active = 1'b0;
         for (int i = 0; i < NUM_SM; i++) begin
-            if (sm_active[i] && !found_active) begin
+            if (sm_mem_req[i] && !found_active) begin
                 active_sm_mem = i;
                 found_active = 1'b1;
             end
@@ -665,5 +674,13 @@ module ecat_sync_manager_array #(
         
         cfg_rdata = sm_cfg_rdata[cfg_sm_sel];
     end
+
+    // Status packing
+    generate
+        for (genvar s = 0; s < NUM_SM; s++) begin : gen_sm_status
+            assign sm_status_packed[s*8 +: 8] = sm_status[s];
+            assign sm_active_bits[s] = sm_active[s];
+        end
+    endgenerate
 
 endmodule

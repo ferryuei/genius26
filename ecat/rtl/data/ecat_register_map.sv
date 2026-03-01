@@ -83,6 +83,12 @@ module ecat_register_map #(
     output reg  [NUM_SM-1:0]        sm_enable,            // 8 x 1-bit
     output reg  [NUM_SM-1:0]        sm_repeat,            // 8 x 1-bit
     input  wire [NUM_SM*8-1:0]      sm_status_in,         // 8 x 8-bit status from SM
+
+    // Sync Manager config mirror (for SM array)
+    output reg                      sm_cfg_wr,
+    output reg  [3:0]               sm_cfg_sel,
+    output reg  [7:0]               sm_cfg_addr,
+    output reg  [15:0]              sm_cfg_wdata,
     
     // Watchdog outputs
     output reg  [15:0]              watchdog_divider,
@@ -668,6 +674,10 @@ module ecat_register_map #(
             sm_control <= {NUM_SM{8'h00}};
             sm_enable <= {NUM_SM{1'b0}};
             sm_repeat <= {NUM_SM{1'b0}};
+            sm_cfg_wr <= 1'b0;
+            sm_cfg_sel <= 4'b0000;
+            sm_cfg_addr <= 8'h00;
+            sm_cfg_wdata <= 16'h0000;
             
             // DC registers
             for (i = 0; i < 4; i = i + 1) begin
@@ -701,6 +711,7 @@ module ecat_register_map #(
             
         end else begin
             al_control_changed <= 1'b0;
+            sm_cfg_wr <= 1'b0;
             
             // Update watchdog status from external signal
             if (watchdog_expired) begin
@@ -865,6 +876,10 @@ module ecat_register_map #(
                         end
                         default: ;
                     endcase
+                    sm_cfg_wr <= 1'b1;
+                    sm_cfg_sel <= {1'b0, sm_idx};
+                    sm_cfg_addr <= {5'b0, sm_off};
+                    sm_cfg_wdata <= reg_wdata;
                 end
                 
                 // DC registers (0x0900-0x09FF)
