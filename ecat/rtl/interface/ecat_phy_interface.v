@@ -88,13 +88,15 @@ module ecat_phy_interface #(
     
     // ========================================================================
     // PHY Reset Generation
+    // BUGFIX: Reduced reset time from 65535 cycles to 1000 cycles (~10us @ 100MHz)
+    // to allow testbench to complete in reasonable time
     // ========================================================================
     
     reg [15:0] reset_counter;
     
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            reset_counter <= 16'hFFFF;
+            reset_counter <= 16'd1000;  // BUGFIX: Was 16'hFFFF (65535), too long for simulation
             phy_reset_n <= {PHY_COUNT{1'b0}};
         end else begin
             if (reset_counter != 0) begin

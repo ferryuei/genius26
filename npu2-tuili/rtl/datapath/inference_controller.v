@@ -250,7 +250,13 @@ module inference_controller #(
                     
                     // Don't clear feeder_start and array_start - they will be set in START_COMPUTE
                     
+                    // DEBUG: Print bridge_done status
+                    if ($time > 1390000 && $time < 1400000) begin  // Around 1391ns when bridge sends DONE
+                        $display("  [%0t ns] IC WAIT_WEIGHTS: bridge_done=%b", $time/1000.0, bridge_done);
+                    end
+                    
                     if (bridge_done) begin
+                        $display("  [%0t ns] IC: bridge_done detected, transitioning to LOAD_ACTIVATION", $time/1000.0);
                         state <= LOAD_ACTIVATION;
                         load_activation_issued <= 1'b0;
                     end
@@ -277,13 +283,18 @@ module inference_controller #(
                         bridge_start <= 1'b1;
                         
                         load_activation_issued <= 1'b1;
+                        $display("  [%0t ns] IC LOAD_ACTIVATION: Started activation loading", $time/1000.0);
                     end else begin
                         dma_start <= 1'b0;
                         bridge_start <= 1'b0;
+                        
+                        // FIXED: Transition to WAIT_ACTIVATION when bridge is done
+                        if (bridge_done) begin
+                            $display("  [%0t ns] IC LOAD_ACTIVATION: bridge_done detected, transitioning to WAIT_ACTIVATION", $time/1000.0);
+                            state <= WAIT_ACTIVATION;
+                            load_activation_issued <= 1'b0;  // Reset for next layer
+                        end
                     end
-                    
-                    // Immediately transition to WAIT_ACTIVATION to avoid re-triggering
-                    state <= WAIT_ACTIVATION;
                 end
                 
                 WAIT_ACTIVATION: begin
@@ -297,6 +308,7 @@ module inference_controller #(
                     array_start <= {NUM_ARRAYS{1'b0}};
                     
                     if (bridge_done) begin
+                        $display("  [%0t ns] IC WAIT_ACTIVATION: bridge_done detected, transitioning to START_COMPUTE", $time/1000.0);
                         state <= START_COMPUTE;
                     end
                 end
@@ -367,7 +379,12 @@ module inference_controller #(
                     
                     // Start result collector
                     collector_start[target_array] <= 1'b1;
-                    state <= WRITEBACK;
+                    
+                    // Wait for result collector to finish collecting
+                    if (collector_done[target_array]) begin
+                        $display("  [%0t ns] IC COLLECT_RESULTS: Collector done, moving to WRITEBACK", $time/1000.0);
+                        state <= WRITEBACK;
+                    end
                 end
                 
                 WRITEBACK: begin
@@ -377,15 +394,24 @@ module inference_controller #(
                     array_start <= {NUM_ARRAYS{1'b0}};
                     collector_start <= {NUM_ARRAYS{1'b0}};
                     
-                    // Wait for collector to buffer results
-                    if (collector_done[target_array]) begin
-                        // Start DMA write-back: M20K → DDR
+                    // Wait for DMA to be idle (done signal low) before starting write-back
+                    // This ensures previous DMA read operations have completed
+                    if (!dma_done && !dma_start) begin
+                        // DMA is idle, safe to start write-back
                         dma_dst_addr <= result_ddr_addr;
                         dma_length <= {16'd0, result_size};
                         dma_start <= 1'b1;
                         dma_write_mode <= 1'b1;  // Write to DDR
                         
+                        $display("  [%0t ns] IC WRITEBACK: Starting DMA write-back, addr=0x%h, length=%d", 
+                                 $time/1000.0, result_ddr_addr, result_size);
+                        
                         state <= WAIT_WRITEBACK;
+                    end else begin
+                        // DMA is still busy, wait
+                        dma_start <= 1'b0;
+                        $display("  [%0t ns] IC WRITEBACK: Waiting for DMA to be idle (done=%b)", 
+                                 $time/1000.0, dma_done);
                     end
                 end
                 

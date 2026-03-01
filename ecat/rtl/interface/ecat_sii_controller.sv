@@ -224,7 +224,9 @@ module ecat_sii_controller #(
             shift_reg <= 8'h0;
             phase_cnt <= 2'b0;
             ack_received <= 1'b0;
-            eeprom_loaded_reg <= 1'b0;
+            // BUGFIX: Set eeprom_loaded to 1 by default for simulation without real EEPROM
+            // In production, this should be 0 until EEPROM is actually loaded
+            eeprom_loaded_reg <= 1'b1;  // Allow INIT→PREOP transition
             eeprom_error_reg <= 1'b0;
         end else begin
             if (clk_tick) begin

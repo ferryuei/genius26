@@ -389,7 +389,8 @@ module ecat_register_map #(
                 // Device Information (0x0000-0x000F)
                 if (reg_addr == ADDR_TYPE) reg_rdata <= {REVISION, DEVICE_TYPE};
                 else if (reg_addr == ADDR_BUILD) reg_rdata <= BUILD;
-                else if (reg_addr == ADDR_FMMU_NUM) reg_rdata <= {SM_COUNT, FMMU_COUNT};
+                else if (reg_addr == ADDR_FMMU_NUM) reg_rdata <= {8'h00, FMMU_COUNT};
+                else if (reg_addr == ADDR_SM_NUM) reg_rdata <= {8'h00, SM_COUNT};
                 else if (reg_addr == ADDR_RAM_SIZE) reg_rdata <= {PORT_DESC, RAM_SIZE};
                 else if (reg_addr == ADDR_FEATURES) reg_rdata <= ESC_FEATURES;
                 

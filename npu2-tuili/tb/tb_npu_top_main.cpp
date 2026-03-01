@@ -21,24 +21,40 @@ int main(int argc, char** argv) {
     tfp->open("waves/tb_npu_top.vcd");
     
     // Run simulation with clock driving
-    // Note: Verilator requires explicit clock toggling
+    // Time unit: 1 time unit = 1 ps (to match Verilog timescale 1ns/1ps)
+    // Clock period = 1.667 ns = 1667 ps = 1667 time units
     vluint64_t sim_time = 0;
-    const vluint64_t max_sim_time = 2000000; // 2M time units
+    const vluint64_t max_sim_time = 100000000; // 100M ps = 100 ms
+    
+    // Initialize clock
+    top->clk = 0;
+    
+    // Set context time for proper $time in Verilog
+    Verilated::time(sim_time);
     
     while (!Verilated::gotFinish() && sim_time < max_sim_time) {
-        // Toggle clock every time unit (creates clock edges)
-        // This replaces the Verilog "forever #(CLK_PERIOD/2) clk = ~clk"
-        if ((sim_time % 2) == 0) {
+        // Toggle clock every 833.5 ps (half of 1.667ns period)
+        // Simplified: toggle every 834 time units
+        bool prev_clk = top->clk;
+        if ((sim_time % 1667) < 834) {
             top->clk = 0;
         } else {
             top->clk = 1;
         }
+        
+        // Update context time
+        Verilated::time(sim_time);
         
         // Evaluate model
         top->eval();
         
         // Dump trace
         tfp->dump(sim_time);
+        
+        // Flush trace periodically to see progress
+        if (sim_time % 100000 == 0) {
+            tfp->flush();
+        }
         
         sim_time++;
     }

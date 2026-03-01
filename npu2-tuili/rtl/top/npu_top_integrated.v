@@ -84,7 +84,7 @@ module npu_top_integrated #(
     // DMA Read Stream
     wire [DATA_WIDTH-1:0]       dma_rd_data;
     wire                        dma_rd_valid;
-    wire                        dma_rd_ready;
+    wire                        dma_rd_ready = 1'b1;  // FIXED: Drive ready high to enable bridge data flow
     
     // DMA Write Stream
     wire [DATA_WIDTH-1:0]       dma_wr_data;
@@ -214,6 +214,14 @@ module npu_top_integrated #(
     assign dma_start = start_inference ? dma_start_infer : dma_start_comm;
     assign dma_write_mode = start_inference ? dma_write_mode_infer : 1'b0;
     
+    // Debug: Monitor DMA control signals
+    always @(posedge clk) begin
+        if (dma_start) begin
+            $display("  [%0t ns] TOP: DMA start asserted, write_mode=%b, length=%d, dst_addr=0x%h", 
+                     $time/1000.0, dma_write_mode, dma_length, dma_dst_addr);
+        end
+    end
+    
     // Collector stream mux (simplified: use array 0 for now)
     assign dma_wr_data = collector_stream_data[0];
     assign dma_wr_valid = collector_stream_valid[0];
@@ -278,8 +286,8 @@ module npu_top_integrated #(
         .stream_rd_data     (dma_rd_data),
         .stream_rd_valid    (dma_rd_valid),
         .stream_rd_ready    (dma_rd_ready),
-        .stream_wr_data     (pe_result_stream),      // Connect result collector output
-        .stream_wr_valid    (pe_result_valid_stream), // Connect result collector output
+        .stream_wr_data     (dma_wr_data),           // Result collector stream data
+        .stream_wr_valid    (dma_wr_valid),          // Result collector stream valid
         .stream_wr_ready    (dma_wr_ready)
     );
     

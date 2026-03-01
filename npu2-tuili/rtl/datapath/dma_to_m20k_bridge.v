@@ -109,6 +109,7 @@ module dma_to_m20k_bridge #(
                         current_addr <= current_addr + 1'b1;
                         words_remaining <= words_remaining - 1'b1;
                         
+                        // FIXED: Check if we've processed all words (when decremented to 0)
                         if (words_remaining == 16'd1) begin
                             stream_ready <= 1'b0;
                             state <= DONE_STATE;

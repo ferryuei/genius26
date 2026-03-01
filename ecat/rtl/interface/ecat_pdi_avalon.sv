@@ -111,10 +111,20 @@ module ecat_pdi_avalon #(
         
         case (state)
             IDLE: begin
-                if ((avs_read || avs_write) && pdi_enable)
-                    next_state = (addr_space == ADDR_SPACE_REGS) ? REG_ACCESS : SM_ACCESS;
-                else if ((avs_read || avs_write) && !pdi_enable)
-                    next_state = ERROR;
+                // BUGFIX: Allow register access even when PDI not enabled (for device discovery)
+                // Only block SM/Process Data access when not enabled
+                if (avs_read || avs_write) begin
+                    if (addr_space == ADDR_SPACE_REGS) begin
+                        // Register access always allowed for configuration
+                        next_state = REG_ACCESS;
+                    end else if (pdi_enable) begin
+                        // Process data/mailbox only when PDI enabled
+                        next_state = SM_ACCESS;
+                    end else begin
+                        // Block process data access when PDI disabled
+                        next_state = ERROR;
+                    end
+                end
             end
             
             REG_ACCESS: begin

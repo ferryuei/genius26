@@ -310,7 +310,11 @@ module ecat_frame_receiver #(
             case (state)
                 // ============================================================
                 S_IDLE: begin
-                    if (rx_valid && rx_sof) begin
+                    // BUGFIX: Check for rx_error even in IDLE state
+                    if (rx_error && rx_valid) begin
+                        rx_error_count <= rx_error_count + 1;
+                        state <= S_ERROR;
+                    end else if (rx_valid && rx_sof) begin
                         state <= S_ETH_HDR;
                         byte_cnt <= 1;
                         fwd_valid <= 1;

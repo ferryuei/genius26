@@ -194,19 +194,25 @@ module ddr4_emif_model #(
             if (avmm_write) begin
                 memory[avmm_address[15:0]] <= avmm_writedata;
                 avmm_waitrequest <= 1'b0;
+                $display("  [%0t ns] DDR WRITE: addr=0x%h, data=0x%h", $time/1000.0, avmm_address, avmm_writedata);
             end else if (avmm_read) begin
                 current_addr <= avmm_address;
                 burst_counter <= avmm_burstcount;
                 avmm_waitrequest <= 1'b1;
+                $display("  [%0t ns] DDR: Starting burst read, addr=0x%h, burstcount=%d", 
+                         $time/1000.0, avmm_address, avmm_burstcount);
             end else if (burst_counter > 0) begin
                 // Simulate read latency
                 avmm_readdata <= memory[current_addr[15:0]];
                 avmm_readdatavalid <= 1'b1;
+                $display("  [%0t ns] DDR: Burst read data, addr=0x%h, data=0x%h, remaining=%d", 
+                         $time/1000.0, current_addr, memory[current_addr[15:0]], burst_counter - 1);
                 current_addr <= current_addr + 1'b1;
                 burst_counter <= burst_counter - 1'b1;
                 
                 if (burst_counter == 1) begin
                     avmm_waitrequest <= 1'b0;
+                    $display("  [%0t ns] DDR: Burst read complete", $time/1000.0);
                 end
             end else begin
                 avmm_waitrequest <= 1'b0;

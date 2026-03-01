@@ -133,19 +133,14 @@ module result_collector #(
                 end
                 
                 FLUSH: begin
-                    // Wait for FIFO to be drained by DMA
+                    // Wait for FIFO to be drained by DMA through stream interface
                     m20k_we <= 1'b0;
                     
                     $display("  [%0t ns] Result Collector[%m]: FLUSH state, fifo_empty=%b, fifo_count=%d, done=%b", 
                              $time/1000.0, fifo_empty, fifo_count, done);
                     
-                    // Force drain FIFO even if stream_ready is not asserted
-                    if (!fifo_empty) begin
-                        fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
-                        fifo_count <= fifo_count - 1'b1;  // Must decrement count too!
-                        $display("  [%0t ns] Result Collector[%m]: Forcing FIFO drain, rd_ptr=%d, count=%d", 
-                                 $time/1000.0, fifo_rd_ptr, fifo_count);
-                    end
+                    // Wait for stream interface to drain FIFO naturally
+                    // Don't force drain - let the stream handshake handle it
                     
                     if (fifo_empty) begin
                         $display("  [%0t ns] Result Collector[%m]: FIFO empty, asserting DONE", $time/1000.0);
@@ -186,7 +181,20 @@ module result_collector #(
             stream_data_reg <= {DATA_WIDTH{1'b0}};
             stream_valid_reg <= 1'b0;
         end else begin
-            if (!fifo_empty && stream_ready) begin
+            // In FLUSH state, keep valid high if FIFO has data
+            // This allows DMA to drain the FIFO properly
+            if (state == FLUSH && !fifo_empty) begin
+                stream_valid_reg <= 1'b1;
+                stream_data_reg <= result_fifo[fifo_rd_ptr];
+                
+                // Only advance read pointer when downstream is ready
+                if (stream_ready) begin
+                    fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+                    $display("  [%0t ns] Result Collector[%m]: Stream handshake, rd_ptr=%d->%d", 
+                             $time/1000.0, fifo_rd_ptr, fifo_rd_ptr + 1'b1);
+                end
+            end else if (!fifo_empty && stream_ready && state != FLUSH) begin
+                // Normal operation during COLLECT state
                 stream_data_reg <= result_fifo[fifo_rd_ptr];
                 stream_valid_reg <= 1'b1;
                 fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
@@ -204,7 +212,7 @@ module result_collector #(
     //==========================================================================
     
     wire fifo_wr_en = pe_result_valid && !fifo_full && (state == COLLECT);
-    wire fifo_rd_en = !fifo_empty && stream_ready;
+    wire fifo_rd_en = stream_valid_reg && stream_ready;  // Count when handshake succeeds
     
     always @(posedge clk) begin
         if (!rst_n) begin

@@ -115,25 +115,48 @@ module dma_engine #(
             write_buffer <= {DDR_DATA_WIDTH{1'b0}};
             write_word_count <= 6'd0;
         end else begin
+            // Debug: Always show current state
+            if (state != IDLE) begin
+                $display("  [%0t ns] DMA: state=%d, done=%b", $time/1000.0, state, done);
+            end
+            
             case (state)
                 IDLE: begin
                     done <= 1'b0;
-                    stream_wr_ready <= 1'b0;
+                    // CRITICAL: Keep stream_wr_ready=1 in IDLE to allow Result Collector to drain FIFO
+                    // BUT only when NOT currently processing a read/write operation
+                    stream_wr_ready <= 1'b1;
+                    
+                    // Buffer incoming stream data while in IDLE
+                    if (stream_wr_valid && !start) begin
+                        $display("  [%0t ns] DMA IDLE: Buffering stream data 0x%h (count=%d)", 
+                                 $time/1000.0, stream_wr_data, write_word_count);
+                        write_buffer[write_word_count * DATA_WIDTH +: DATA_WIDTH] <= stream_wr_data;
+                        write_word_count <= write_word_count + 1'b1;
+                    end
                     
                     if (start) begin
+                        $display("  [%0t ns] DMA IDLE: Received start, write_mode=%b, length=%d, buffered=%d words", 
+                                 $time/1000.0, write_mode, length, write_word_count);
                         dma_mode <= write_mode;
                         bytes_remaining <= length;
                         bytes_transferred <= 32'd0;
-                        write_word_count <= 6'd0;
+                        // Don't reset write_word_count - keep buffered data
                         
                         if (write_mode) begin
                             // Write mode: from fabric to DDR
+                            $display("  [%0t ns] DMA: Entering WRITE mode, dst_addr=0x%h", 
+                                     $time/1000.0, dst_addr);
                             current_addr <= dst_addr;
                             stream_wr_ready <= 1'b1;
                             state <= WRITE_REQ;
                         end else begin
                             // Read mode: from DDR to fabric
+                            $display("  [%0t ns] DMA: Entering READ mode, src_addr=0x%h", 
+                                     $time/1000.0, src_addr);
                             current_addr <= src_addr;
+                            write_word_count <= 6'd0;  // Clear buffer for read mode
+                            stream_wr_ready <= 1'b0;  // Don't accept writes during read
                             state <= READ_REQ;
                         end
                     end
@@ -141,18 +164,24 @@ module dma_engine #(
                 
                 READ_REQ: begin
                     if (!avmm_waitrequest) begin
-                        // Calculate burst size
+                        // Calculate burst size first, then assign burst_remaining
+                        reg [7:0] calculated_burst;
+                        
                         if (bytes_remaining >= (MAX_BURST * (DDR_DATA_WIDTH/8))) begin
-                            burst_count <= MAX_BURST;
+                            calculated_burst = MAX_BURST;
                         end else begin
-                            burst_count <= bytes_remaining / (DDR_DATA_WIDTH/8);
+                            calculated_burst = bytes_remaining / (DDR_DATA_WIDTH/8);
                         end
                         
-                        // Issue read request
+                        // Issue read request with calculated burst count
                         avmm_address <= current_addr;
                         avmm_read <= 1'b1;
-                        avmm_burstcount <= burst_count;
-                        burst_remaining <= burst_count;
+                        avmm_burstcount <= calculated_burst;
+                        burst_remaining <= calculated_burst;  // Use calculated value
+                        burst_count <= calculated_burst;
+                        
+                        $display("  [%0t ns] DMA READ_REQ: burst_count=%d, burst_remaining=%d, bytes_remaining=%d", 
+                                 $time/1000.0, calculated_burst, calculated_burst, bytes_remaining);
                         
                         state <= READ_DATA;
                     end
@@ -160,8 +189,14 @@ module dma_engine #(
                 
                 READ_DATA: begin
                     avmm_read <= 1'b0;
+                    stream_wr_ready <= 1'b0;  // Don't accept writes during read mode
+                    
+                    $display("  [%0t ns] DMA READ_DATA: waiting for data, burst_remaining=%d, avmm_readdatavalid=%b", 
+                             $time/1000.0, burst_remaining, avmm_readdatavalid);
                     
                     if (avmm_readdatavalid) begin
+                        $display("  [%0t ns] DMA READ_DATA: Got data, burst_remaining=%d", 
+                                 $time/1000.0, burst_remaining);
                         // Store data in FIFO
                         if (!fifo_full) begin
                             read_fifo[fifo_wr_ptr] <= avmm_readdata;
@@ -175,9 +210,14 @@ module dma_engine #(
                             bytes_remaining <= bytes_remaining - (burst_count * (DDR_DATA_WIDTH/8));
                             current_addr <= current_addr + (burst_count * (DDR_DATA_WIDTH/8));
                             
+                            $display("  [%0t ns] DMA READ_DATA: Burst complete, bytes_remaining=%d", 
+                                     $time/1000.0, bytes_remaining - (burst_count * (DDR_DATA_WIDTH/8)));
+                            
                             if (bytes_remaining <= (burst_count * (DDR_DATA_WIDTH/8))) begin
+                                $display("  [%0t ns] DMA READ_DATA: All data read, going to DONE", $time/1000.0);
                                 state <= DONE_STATE;
                             end else begin
+                                $display("  [%0t ns] DMA READ_DATA: More data needed, going to READ_REQ", $time/1000.0);
                                 state <= READ_REQ;  // More data to read
                             end
                         end
@@ -244,9 +284,17 @@ module dma_engine #(
                 end
                 
                 DONE_STATE: begin
+                    $display("  [%0t ns] DMA: In DONE_STATE, asserting done", $time/1000.0);
                     done <= 1'b1;
                     stream_wr_ready <= 1'b0;
-                    state <= IDLE;
+                    
+                    // Stay in DONE_STATE for one cycle, then return to IDLE
+                    // This ensures done signal is properly recognized
+                    if (done) begin
+                        $display("  [%0t ns] DMA: Done acknowledged, returning to IDLE", $time/1000.0);
+                        done <= 1'b0;
+                        state <= IDLE;
+                    end
                 end
                 
                 default: state <= IDLE;
@@ -284,10 +332,18 @@ module dma_engine #(
             stream_valid_reg <= 1'b0;
             fifo_rd_ptr <= 4'd0;
         end else begin
-            if (!fifo_empty && stream_rd_ready) begin
-                stream_data_reg <= read_fifo[fifo_rd_ptr];
+            // FIXED: Proper stream handshake protocol
+            // stream_valid should be 1 when FIFO has data, regardless of stream_rd_ready
+            if (!fifo_empty) begin
                 stream_valid_reg <= 1'b1;
-                fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+                stream_data_reg <= read_fifo[fifo_rd_ptr];
+                
+                // Only advance FIFO pointer when both valid and ready are high
+                if (stream_rd_valid && stream_rd_ready) begin
+                    fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+                    $display("  [%0t ns] DMA: Stream handshake completed, rd_ptr=%d->%d", 
+                             $time/1000.0, fifo_rd_ptr, fifo_rd_ptr + 1'b1);
+                end
             end else begin
                 stream_valid_reg <= 1'b0;
             end
