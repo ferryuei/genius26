@@ -186,7 +186,11 @@ module dma_engine #(
                 
                 WRITE_REQ: begin
                     // Accumulate 32-bit words into 512-bit buffer
+                    $display("  [%0t ns] DMA WRITE_REQ: stream_wr_valid=%b, stream_wr_ready=%b, bytes_remaining=%d", 
+                             $time/1000.0, stream_wr_valid, stream_wr_ready, bytes_remaining);
+                    
                     if (stream_wr_valid && stream_wr_ready) begin
+                        $display("  [%0t ns] DMA WRITE_REQ: Got valid data 0x%h", $time/1000.0, stream_wr_data);
                         // Pack DATA_WIDTH data into DDR_DATA_WIDTH buffer
                         write_buffer[write_word_count * DATA_WIDTH +: DATA_WIDTH] <= stream_wr_data;
                         write_word_count <= write_word_count + 1'b1;
@@ -200,6 +204,9 @@ module dma_engine #(
                             burst_remaining <= 8'd1;
                             state <= WRITE_DATA;
                         end
+                    end else if (bytes_remaining == 0) begin
+                        $display("  [%0t ns] DMA: No more bytes remaining, going to DONE_STATE", $time/1000.0);
+                        state <= DONE_STATE;
                     end
                 end
                 
