@@ -1,0 +1,49 @@
+# 编译输出
+*.vvp
+*.vcd
+*.o
+*.out
+*.exe
+
+# 仿真输出
+*.log
+*.wlf
+*.vstf
+work/
+transcript
+
+# 综合输出
+*.edf
+*.sdc
+*.dcp
+*.bit
+*.mcs
+syn/reports/
+syn/work/
+
+# 临时文件
+*~
+*.swp
+*.bak
+*.backup
+.DS_Store
+
+# IDE配置
+.vscode/
+.idea/
+*.project
+*.cproject
+
+# 编译缓存
+build/
+obj/
+*.d
+
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 测试输出
+test_results/
+coverage/

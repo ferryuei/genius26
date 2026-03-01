@@ -9,7 +9,8 @@
 module ecat_eoe_handler #(
     parameter MTU_SIZE = 1500,            // Maximum Ethernet payload
     parameter TX_BUFFER_SIZE = 2048,      // TX buffer size
-    parameter RX_BUFFER_SIZE = 2048       // RX buffer size
+    parameter RX_BUFFER_SIZE = 2048,      // RX buffer size
+    parameter TIMEOUT_CYCLES = 100000     // BUGFIX F1-GEN-01: Timeout = 1ms @ 100MHz
 )(
     // System signals
     input  wire                     rst_n,
@@ -136,7 +137,10 @@ module ecat_eoe_handler #(
     // Internal Counters
     // ========================================================================
     reg [10:0]  byte_index;
-    reg [15:0]  timeout_counter;
+    reg [15:0]  timeout_counter;  // Existing counter, repurpose for fragment timeout
+    
+    // BUGFIX F1-GEN-01: Watchdog timer for timeout protection
+    reg [19:0]  watchdog_counter;
 
     // Helper: Extract byte from packed input
     function [7:0] get_data_byte;
@@ -192,11 +196,27 @@ module ecat_eoe_handler #(
             filter_multicast <= 1'b0;
             byte_index <= 11'h0;
             timeout_counter <= 16'h0;
+            watchdog_counter <= 20'h0;  // BUGFIX F1-GEN-01: Initialize watchdog
         end else begin
             // Defaults
             eoe_response_ready <= 1'b0;
             eth_tx_valid <= 1'b0;
             eth_tx_last <= 1'b0;
+            
+            // BUGFIX F1-GEN-01: Watchdog timer management
+            if (state != ST_IDLE && state != ST_DONE) begin
+                watchdog_counter <= watchdog_counter + 1;
+                
+                // Check for timeout
+                if (watchdog_counter >= TIMEOUT_CYCLES[19:0]) begin
+                    eoe_response_result <= EOE_RESULT_UNSPECIFIED;
+                    eoe_response_type <= eoe_type | 4'h1;  // Response type = Request type + 1
+                    state <= ST_SEND_RESPONSE;
+                    watchdog_counter <= 20'h0;
+                end
+            end else begin
+                watchdog_counter <= 20'h0;
+            end
 
             case (state)
                 // ============================================================
@@ -406,7 +426,12 @@ module ecat_eoe_handler #(
                 // ============================================================
                 ST_SEND_RESPONSE: begin
                     eoe_response_ready <= 1'b1;
-                    state <= ST_DONE;
+                    // BUGFIX P1-EOE-01: Keep response signal high until request cleared
+                    // Previous bug: response_ready only lasted 1 clock cycle, 
+                    // causing testbench to miss the response
+                    if (!eoe_request) begin
+                        state <= ST_DONE;
+                    end
                 end
 
                 // ============================================================
@@ -432,6 +457,7 @@ module ecat_eoe_handler #(
                 // ============================================================
                 ST_DONE: begin
                     eoe_busy <= 1'b0;
+                    eoe_response_ready <= 1'b0;  // Clear response signal
                     state <= ST_IDLE;
                 end
 

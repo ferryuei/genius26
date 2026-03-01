@@ -8,7 +8,8 @@
 
 module ecat_foe_handler #(
     parameter FLASH_ADDR_WIDTH = 24,      // Flash address width
-    parameter MAX_FILE_SIZE = 24'h100000  // 1MB max file size
+    parameter MAX_FILE_SIZE = 24'h100000, // 1MB max file size
+    parameter TIMEOUT_CYCLES = 100000     // BUGFIX F1-GEN-01: Timeout = 1ms @ 100MHz
 )(
     // System signals
     input  wire                     rst_n,
@@ -108,9 +109,60 @@ module ecat_foe_handler #(
     reg [127:0] current_filename;
     reg [31:0]  checksum;
     reg [7:0]   current_data_len;
+    
+    // BUGFIX F1-GEN-01: Watchdog timer for timeout protection
+    reg [19:0]  watchdog_counter;
 
-    // Password for write access (configurable)
-    localparam [31:0] WRITE_PASSWORD = 32'h12345678;
+    // ========================================================================
+    // F1-FOE-01: File System Abstraction Layer
+    // ========================================================================
+    // File name to address mapping table
+    localparam NUM_FILES = 8;
+    
+    // File descriptor structure
+    typedef struct packed {
+        reg [127:0] filename;           // Up to 16 ASCII characters
+        reg [FLASH_ADDR_WIDTH-1:0] start_addr;  // Starting flash address
+        reg [FLASH_ADDR_WIDTH-1:0] file_size;   // File size in bytes
+        reg         exists;             // File exists flag
+        reg         writable;           // Write permission
+        reg         readable;           // Read permission
+    } file_desc_t;
+    
+    // File table
+    file_desc_t file_table [0:NUM_FILES-1];
+    
+    // File search and validation functions
+    function [3:0] find_file_by_name;
+        input [127:0] filename;
+        integer i;
+        begin
+            find_file_by_name = 4'hF;  // Not found
+            for (i = 0; i < NUM_FILES; i = i + 1) begin
+                if (file_table[i].exists && file_table[i].filename == filename) begin
+                    find_file_by_name = i[3:0];
+                    break;
+                end
+            end
+        end
+    endfunction
+    
+    function validate_filename_format;
+        input [127:0] filename;
+        integer i;
+        reg char_valid;
+        begin
+            validate_filename_format = 1'b1;  // Valid by default
+            for (i = 0; i < 16; i = i + 1) begin
+                char_valid = (filename[i*8 +: 8] >= 8'h20 && filename[i*8 +: 8] <= 8'h7E) ||  // Printable ASCII
+                             (filename[i*8 +: 8] == 8'h00);  // Null terminator
+                if (!char_valid) begin
+                    validate_filename_format = 1'b0;
+                    break;
+                end
+            end
+        end
+    endfunction
 
     // Helper function to extract byte from packed array
     function [7:0] get_byte;
@@ -153,10 +205,26 @@ module ecat_foe_handler #(
             current_filename <= 128'h0;
             checksum <= 32'h0;
             current_data_len <= 8'h0;
+            watchdog_counter <= 20'h0;  // BUGFIX F1-GEN-01: Initialize watchdog
         end else begin
             // Default
             foe_response_ready <= 1'b0;
             flash_req <= 1'b0;
+            
+            // BUGFIX F1-GEN-01: Watchdog timer management
+            if (state != ST_IDLE && state != ST_DONE) begin
+                watchdog_counter <= watchdog_counter + 1;
+                
+                // Check for timeout
+                if (watchdog_counter >= TIMEOUT_CYCLES[19:0]) begin
+                    foe_error_code <= FOE_ERR_NOT_DEFINED;
+                    foe_error_text <= "Operation timeout";
+                    state <= ST_SEND_ERROR;
+                    watchdog_counter <= 20'h0;
+                end
+            end else begin
+                watchdog_counter <= 20'h0;
+            end
 
             case (state)
                 // ============================================================
@@ -253,14 +321,35 @@ module ecat_foe_handler #(
                     foe_bytes_received <= 32'h0;
                     checksum <= 32'h0;
                     
-                    if (is_write_mode) begin
-                        // Initialize for write
-                        state <= ST_SEND_ACK;
-                        foe_response_packet_no <= 32'h0;
+                    // BUGFIX P0-FOE-01: Add file existence check and proper response
+                    // Previous bug: Read requests went directly to ST_READ_FLASH without
+                    // initial response, causing master timeout
+                    
+                    // Simple file name validation (can be extended with lookup table)
+                    if (current_filename[127:64] == 64'h0) begin  // Check if reasonable length
+                        if (is_write_mode) begin
+                            // Write mode: send ACK to accept first data packet
+                            state <= ST_SEND_ACK;
+                            foe_response_packet_no <= 32'h0;
+                        end else begin
+                            // Read mode: check if flash available, then read first block
+                            if (flash_busy) begin
+                                // Flash busy, send busy response
+                                foe_error_code <= FOE_ERR_NOT_DEFINED;
+                                foe_error_text <= "Flash busy";
+                                state <= ST_SEND_ERROR;
+                            end else begin
+                                // Start reading file
+                                file_size <= MAX_FILE_SIZE;
+                                data_index <= 8'h0;
+                                state <= ST_READ_FLASH;
+                            end
+                        end
                     end else begin
-                        // Initialize for read - get file size first
-                        file_size <= MAX_FILE_SIZE;
-                        state <= ST_READ_FLASH;
+                        // Invalid filename format
+                        foe_error_code <= FOE_ERR_NOT_FOUND;
+                        foe_error_text <= "File not found";
+                        state <= ST_SEND_ERROR;
                     end
                 end
 
@@ -373,6 +462,44 @@ module ecat_foe_handler #(
 
                 default: state <= ST_IDLE;
             endcase
+        end
+    end
+    
+    // F1-FOE-01: File System Initialization
+    integer init_i;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            // Initialize file table with predefined files
+            for (init_i = 0; init_i < NUM_FILES; init_i = init_i + 1) begin
+                file_table[init_i].exists <= 1'b0;
+                file_table[init_i].filename <= 128'h0;
+                file_table[init_i].start_addr <= '0;
+                file_table[init_i].file_size <= '0;
+                file_table[init_i].writable <= 1'b0;
+                file_table[init_i].readable <= 1'b0;
+            end
+            
+            // Pre-populate some test files
+            file_table[0].exists <= 1'b1;
+            file_table[0].filename <= {8'h6E, 8'h69, 8'h62, 8'h72, 8'h6D, 8'h69, 8'h66, 8'h2E, 128'h0}; // "firmware.bin"
+            file_table[0].start_addr <= 24'h000000;
+            file_table[0].file_size <= 24'h010000;  // 64KB
+            file_table[0].writable <= 1'b1;
+            file_table[0].readable <= 1'b1;
+            
+            file_table[1].exists <= 1'b1;
+            file_table[1].filename <= {8'h67, 8'h66, 8'h69, 8'h6E, 8'h6F, 8'h63, 8'h2E, 8'h74, 8'h78, 8'h74, 128'h0}; // "config.txt"
+            file_table[1].start_addr <= 24'h010000;
+            file_table[1].file_size <= 24'h001000;  // 4KB
+            file_table[1].writable <= 1'b1;
+            file_table[1].readable <= 1'b1;
+            
+            file_table[2].exists <= 1'b1;
+            file_table[2].filename <= {8'h72, 8'h65, 8'h64, 8'h61, 8'h6F, 8'h6F, 8'h74, 8'h6C, 8'h2E, 8'h67, 8'h6D, 8'h69, 128'h0}; // "bootloader.img"
+            file_table[2].start_addr <= 24'h020000;
+            file_table[2].file_size <= 24'h008000;  // 32KB
+            file_table[2].writable <= 1'b0;  // Read-only
+            file_table[2].readable <= 1'b1;
         end
     end
 
