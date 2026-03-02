@@ -203,7 +203,7 @@ RTL_SOURCES = \
 	$(RTL_DIR)/datapath/activation_feeder.v \
 	$(RTL_DIR)/datapath/result_collector.v \
 	$(RTL_DIR)/datapath/sfu_datapath_bridge.v \
-	$(RTL_DIR)/sfu/sfu_unit_enhanced.v \
+	$(RTL_DIR)/sfu/sfu_unit.v \
 	$(RTL_DIR)/ip_models/intel_ip_models.v \
 	$(RTL_DIR)/top/npu_top_integrated.v
 
