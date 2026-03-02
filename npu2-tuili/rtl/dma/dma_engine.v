@@ -84,6 +84,11 @@ module dma_engine #(
     assign fifo_empty = (fifo_count == 5'd0);
     assign fifo_full = (fifo_count == 5'd16);
     
+    reg [3:0]               sub_word_ptr;   // Which 32-bit slice of the current 512-bit entry
+    
+    // Number of 32-bit sub-words per DDR word
+    localparam WORDS_PER_DDR = DDR_DATA_WIDTH / DATA_WIDTH;  // 16
+    
     // Write data buffering
     reg [DDR_DATA_WIDTH-1:0] write_buffer;
     reg [5:0]               write_word_count;   // Count 32-bit words (max 16 for 512-bit)
@@ -156,6 +161,7 @@ module dma_engine #(
                                      $time/1000.0, src_addr);
                             current_addr <= src_addr;
                             write_word_count <= 6'd0;  // Clear buffer for read mode
+                            sub_word_ptr <= 4'd0;      // Reset sub-word demux counter
                             stream_wr_ready <= 1'b0;  // Don't accept writes during read
                             state <= READ_REQ;
                         end
@@ -169,8 +175,12 @@ module dma_engine #(
                         
                         if (bytes_remaining >= (MAX_BURST * (DDR_DATA_WIDTH/8))) begin
                             calculated_burst = MAX_BURST;
-                        end else begin
+                        end else if (bytes_remaining >= (DDR_DATA_WIDTH/8)) begin
                             calculated_burst = bytes_remaining / (DDR_DATA_WIDTH/8);
+                        end else begin
+                            // FIX: transfers smaller than one DDR word still need 1 burst;
+                            // integer division would yield 0, causing READ_DATA deadlock.
+                            calculated_burst = 8'd1;
                         end
                         
                         // Issue read request with calculated burst count
@@ -306,14 +316,18 @@ module dma_engine #(
     // FIFO Count Management
     //==========================================================================
     
+    // A FIFO entry is fully consumed only after all WORDS_PER_DDR sub-words are streamed
+    wire fifo_rd_en = stream_rd_valid && stream_rd_ready &&
+                      (sub_word_ptr == (WORDS_PER_DDR - 1)) && !fifo_empty;
+    
     always @(posedge clk) begin
         if (!rst_n) begin
             fifo_count <= 5'd0;
         end else begin
-            case ({avmm_readdatavalid && !fifo_full, stream_rd_valid && stream_rd_ready})
+            case ({avmm_readdatavalid && !fifo_full, fifo_rd_en})
                 2'b10: fifo_count <= fifo_count + 1'b1;  // Write only
-                2'b01: fifo_count <= fifo_count - 1'b1;  // Read only
-                2'b11: fifo_count <= fifo_count;         // Both
+                2'b01: fifo_count <= fifo_count - 1'b1;  // Read only (last sub-word)
+                2'b11: fifo_count <= fifo_count;         // Both simultaneously
                 default: fifo_count <= fifo_count;
             endcase
         end
@@ -331,18 +345,31 @@ module dma_engine #(
             stream_data_reg <= {DDR_DATA_WIDTH{1'b0}};
             stream_valid_reg <= 1'b0;
             fifo_rd_ptr <= 4'd0;
+            sub_word_ptr <= 4'd0;
         end else begin
-            // FIXED: Proper stream handshake protocol
-            // stream_valid should be 1 when FIFO has data, regardless of stream_rd_ready
-            if (!fifo_empty) begin
+            // FIX: Properly demultiplex each 512-bit DDR FIFO entry into
+            // (DDR_DATA_WIDTH/DATA_WIDTH)=16 consecutive 32-bit stream words.
+            // sub_word_ptr counts which 32-bit slice is being output.
+            // fifo_rd_ptr only advances after all 16 sub-words are consumed.
+            if (!fifo_empty || (sub_word_ptr != 4'd0)) begin
+                // Latch the current FIFO entry when starting a new one
+                if (sub_word_ptr == 4'd0) begin
+                    stream_data_reg <= read_fifo[fifo_rd_ptr];
+                end
                 stream_valid_reg <= 1'b1;
-                stream_data_reg <= read_fifo[fifo_rd_ptr];
                 
-                // Only advance FIFO pointer when both valid and ready are high
                 if (stream_rd_valid && stream_rd_ready) begin
-                    fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
-                    $display("  [%0t ns] DMA: Stream handshake completed, rd_ptr=%d->%d", 
-                             $time/1000.0, fifo_rd_ptr, fifo_rd_ptr + 1'b1);
+                    $display("  [%0t ns] DMA: Stream handshake completed, sub_word=%d, fifo_rd_ptr=%d", 
+                             $time/1000.0, sub_word_ptr, fifo_rd_ptr);
+                    if (sub_word_ptr == (WORDS_PER_DDR - 1)) begin
+                        // Last sub-word of this FIFO entry: advance FIFO pointer
+                        sub_word_ptr <= 4'd0;
+                        if (!fifo_empty) begin
+                            fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+                        end
+                    end else begin
+                        sub_word_ptr <= sub_word_ptr + 1'b1;
+                    end
                 end
             end else begin
                 stream_valid_reg <= 1'b0;
@@ -350,8 +377,8 @@ module dma_engine #(
         end
     end
     
-    // Data width conversion (512-bit to 32-bit)
-    assign stream_rd_data = stream_data_reg[DATA_WIDTH-1:0];
+    // Output the correct 32-bit slice based on sub_word_ptr
+    assign stream_rd_data = stream_data_reg[sub_word_ptr * DATA_WIDTH +: DATA_WIDTH];
     assign stream_rd_valid = stream_valid_reg;
 
 endmodule

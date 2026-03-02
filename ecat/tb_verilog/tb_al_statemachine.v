@@ -16,8 +16,17 @@ parameter CLK_PERIOD = 10;
 // AL State definitions
 parameter AL_STATE_INIT   = 5'h01;
 parameter AL_STATE_PREOP  = 5'h02;
+parameter AL_STATE_BOOT   = 5'h03;
 parameter AL_STATE_SAFEOP = 5'h04;
 parameter AL_STATE_OP     = 5'h08;
+// Error states
+parameter AL_STATE_INIT_ERR   = 5'h11;
+parameter AL_STATE_PREOP_ERR  = 5'h12;
+parameter AL_STATE_SAFEOP_ERR = 5'h14;
+// AL Status codes
+parameter AL_STATUS_NO_ERROR        = 16'h0000;
+parameter AL_STATUS_INVALID_SETUP   = 16'h0004;
+parameter AL_STATUS_DC_NOT_SYNC     = 16'h0030;
 
 // ============================================================================
 // Test Signals
@@ -183,6 +192,115 @@ task request_state;
 endtask
 
 // ============================================================================
+// Test: BOOT State Transition
+// ============================================================================
+task test_boot_state;
+    begin
+        $display("\n=== TEST: BOOT State Transition ===");
+        reset_dut;
+
+        // INIT -> BOOT (always allowed per spec)
+        request_state(AL_STATE_BOOT, "Boot");
+        $display("  AL status after BOOT request: 0x%02x", al_status);
+        check_pass("INIT -> BOOT transition", al_status == AL_STATE_BOOT);
+
+        // BOOT -> INIT
+        request_state(AL_STATE_INIT, "Init (from Boot)");
+        check_pass("BOOT -> INIT transition", al_status == AL_STATE_INIT);
+    end
+endtask
+
+// ============================================================================
+// Test: DC Sync Error in OP
+// ============================================================================
+task test_dc_sync_error;
+    begin
+        $display("\n=== TEST: DC Sync Error in OP State ===");
+        reset_dut;
+
+        // Reach OP state
+        request_state(AL_STATE_PREOP, "Pre-Op");
+        sm_activate = 8'h0F;
+        request_state(AL_STATE_SAFEOP, "Safe-Op");
+        request_state(AL_STATE_OP, "Op");
+        check_pass("Reached OP", al_status == AL_STATE_OP);
+
+        // Inject DC sync error
+        $display("  Injecting DC sync error...");
+        dc_sync_active = 1;
+        dc_sync_error  = 1;
+        repeat(5) @(posedge clk);
+
+        $display("  AL status code: 0x%04x (expected 0x0030)", al_status_code);
+        check_pass("DC sync error code set", al_status_code == AL_STATUS_DC_NOT_SYNC);
+
+        dc_sync_active = 0;
+        dc_sync_error  = 0;
+        request_state(AL_STATE_INIT, "Init (recover)");
+    end
+endtask
+
+// ============================================================================
+// Test: EEPROM Error Detection
+// ============================================================================
+task test_eeprom_error;
+    begin
+        $display("\n=== TEST: EEPROM Error Detection ===");
+        reset_dut;
+
+        // Reach PREOP
+        request_state(AL_STATE_PREOP, "Pre-Op");
+        check_pass("Reached PREOP", al_status == AL_STATE_PREOP);
+
+        // Inject EEPROM error while in PREOP
+        $display("  Injecting EEPROM error...");
+        eeprom_loaded = 0;
+        eeprom_error  = 1;
+        repeat(5) @(posedge clk);
+
+        $display("  AL status code: 0x%04x (expected 0x0004)", al_status_code);
+        check_pass("EEPROM error code set", al_status_code == AL_STATUS_INVALID_SETUP);
+
+        // Recover
+        eeprom_loaded = 1;
+        eeprom_error  = 0;
+        request_state(AL_STATE_INIT, "Init (recover)");
+    end
+endtask
+
+// ============================================================================
+// Test: PREOP_ERR / SAFEOP_ERR via SM error during transition
+// ============================================================================
+task test_error_states;
+    begin
+        $display("\n=== TEST: Error State Entry (SAFEOP_ERR) ===");
+        reset_dut;
+
+        request_state(AL_STATE_PREOP, "Pre-Op");
+
+        // SM error present during SAFEOP attempt
+        sm_activate = 8'h0F;
+        sm_error    = 8'h01;
+        request_state(AL_STATE_SAFEOP, "Safe-Op (with SM error)");
+
+        $display("  AL status after error transition: 0x%02x", al_status);
+        $display("  AL status code: 0x%04x", al_status_code);
+        check_pass("Error state entered or rejected",
+                   al_status != AL_STATE_SAFEOP || al_status_code != AL_STATUS_NO_ERROR);
+
+        // Check for SAFEOP_ERR or PREOP_ERR
+        check_pass("Error code non-zero on SM error",
+                   al_status_code != AL_STATUS_NO_ERROR ||
+                   al_status == AL_STATE_SAFEOP_ERR || al_status == AL_STATE_PREOP_ERR ||
+                   al_status == AL_STATE_INIT_ERR);
+
+        sm_error = 8'h00;
+        request_state(AL_STATE_INIT, "Init (recover)");
+        check_pass("Recovery to INIT", al_status == AL_STATE_INIT);
+    end
+endtask
+
+// ============================================================================
 // Test: Normal State Transitions
 // ============================================================================
 task test_normal_transitions;
@@ -289,6 +407,18 @@ initial begin
     
     reset_dut;
     test_watchdog_timeout;
+
+    reset_dut;
+    test_boot_state;
+
+    reset_dut;
+    test_dc_sync_error;
+
+    reset_dut;
+    test_eeprom_error;
+
+    reset_dut;
+    test_error_states;
     
     // Summary
     $display("\n========================================");

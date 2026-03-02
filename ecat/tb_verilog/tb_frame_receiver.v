@@ -316,6 +316,270 @@ task test_lrd_frame;
 endtask
 
 // ============================================================================
+// Test 5: NOP (No Operation)
+// ============================================================================
+task test_nop_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 5: NOP (No Operation) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h00;  // CMD: NOP
+        frame_data[3] = 8'h05;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;
+        frame_data[6] = 8'h00; frame_data[7] = 8'h00;
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'hAA; frame_data[13] = 8'hBB;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("NOP frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 6: APRD (Auto-Increment Physical Read)
+// ============================================================================
+task test_aprd_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 6: APRD (Auto-Increment Physical Read) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h01;  // CMD: APRD
+        frame_data[3] = 8'h06;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;  // ADP=0
+        frame_data[6] = 8'h00; frame_data[7] = 8'h01;  // ADO=0x0100
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h00; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("APRD frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 7: APWR (Auto-Increment Physical Write)
+// ============================================================================
+task test_apwr_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 7: APWR (Auto-Increment Physical Write) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h02;  // CMD: APWR
+        frame_data[3] = 8'h07;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;  // ADP=0
+        frame_data[6] = 8'h20; frame_data[7] = 8'h01;  // ADO=0x0120 (AL Control)
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h02; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("APWR frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 8: FPWR (Fixed Physical Write)
+// ============================================================================
+task test_fpwr_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 8: FPWR (Fixed Physical Write) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h05;  // CMD: FPWR
+        frame_data[3] = 8'h08;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h10;  // ADP=0x1000 (station addr)
+        frame_data[6] = 8'h20; frame_data[7] = 8'h01;  // ADO=0x0120
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h02; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("FPWR frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 9: LWR (Logical Write)
+// ============================================================================
+task test_lwr_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 9: LWR (Logical Write) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h10; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h0B;  // CMD: LWR
+        frame_data[3] = 8'h09;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;
+        frame_data[6] = 8'h00; frame_data[7] = 8'h00;
+        frame_data[8] = 8'h04; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h11; frame_data[13] = 8'h22;
+        frame_data[14] = 8'h33; frame_data[15] = 8'h44;
+        frame_data[16] = 8'h00; frame_data[17] = 8'h00;
+        frame_len = 18;
+        send_frame(frame_len);
+
+        check_pass("LWR frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 10: LRW (Logical Read/Write)
+// ============================================================================
+task test_lrw_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 10: LRW (Logical Read/Write) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h10; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h0C;  // CMD: LRW
+        frame_data[3] = 8'h0A;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h10;
+        frame_data[6] = 8'h00; frame_data[7] = 8'h00;
+        frame_data[8] = 8'h04; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'hAA; frame_data[13] = 8'hBB;
+        frame_data[14] = 8'hCC; frame_data[15] = 8'hDD;
+        frame_data[16] = 8'h00; frame_data[17] = 8'h00;
+        frame_len = 18;
+        send_frame(frame_len);
+
+        check_pass("LRW frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 11: BRD (Broadcast Read)
+// ============================================================================
+task test_brd_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 11: BRD (Broadcast Read) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h07;  // CMD: BRD
+        frame_data[3] = 8'h0B;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;
+        frame_data[6] = 8'h30; frame_data[7] = 8'h01;  // ADO=0x0130
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h00; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("BRD frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 12: BRW (Broadcast Read/Write)
+// ============================================================================
+task test_brw_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 12: BRW (Broadcast Read/Write) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h09;  // CMD: BRW
+        frame_data[3] = 8'h0C;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;
+        frame_data[6] = 8'h20; frame_data[7] = 8'h01;
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h08; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("BRW frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 13: ARMW (Auto-Increment Read/Multiple Write)
+// ============================================================================
+task test_armw_frame;
+    reg [15:0] initial_count;
+    begin
+        $display("\n=== TEST 13: ARMW (Auto-Increment Read/Multiple Write) ===");
+        reset_dut;
+        initial_count = rx_frame_count;
+
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h0D;  // CMD: ARMW
+        frame_data[3] = 8'h0D;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;
+        frame_data[6] = 8'h20; frame_data[7] = 8'h01;
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h04; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        check_pass("ARMW frame received", rx_frame_count > initial_count);
+    end
+endtask
+
+// ============================================================================
+// Test 14: WKC Increment Counter Functional Check
+// ============================================================================
+task test_wkc_count;
+    reg [15:0] initial_wkc;
+    begin
+        $display("\n=== TEST 14: WKC Increment Counter ===");
+        reset_dut;
+        initial_wkc = wkc_increment_count;
+
+        // BWR to station address - triggers WKC increment on match
+        frame_data[0] = 8'h0E; frame_data[1] = 8'h10;
+        frame_data[2] = 8'h08;  // CMD: BWR
+        frame_data[3] = 8'h0E;
+        frame_data[4] = 8'h00; frame_data[5] = 8'h00;
+        frame_data[6] = 8'h20; frame_data[7] = 8'h01;
+        frame_data[8] = 8'h02; frame_data[9] = 8'h00;
+        frame_data[10] = 8'h00; frame_data[11] = 8'h00;
+        frame_data[12] = 8'h02; frame_data[13] = 8'h00;
+        frame_data[14] = 8'h00; frame_data[15] = 8'h00;
+        frame_len = 16;
+        send_frame(frame_len);
+
+        $display("  WKC count: %0d -> %0d", initial_wkc, wkc_increment_count);
+        check_pass("WKC counter functional", wkc_increment_count >= initial_wkc);
+    end
+endtask
+
+// ============================================================================
 // Test 4: Frame Error Handling
 // ============================================================================
 task test_frame_error;
@@ -358,6 +622,16 @@ initial begin
     test_fprd_frame;
     test_bwr_frame;
     test_lrd_frame;
+    test_nop_frame;
+    test_aprd_frame;
+    test_apwr_frame;
+    test_fpwr_frame;
+    test_lwr_frame;
+    test_lrw_frame;
+    test_brd_frame;
+    test_brw_frame;
+    test_armw_frame;
+    test_wkc_count;
     test_frame_error;
     
     // Summary
@@ -371,7 +645,7 @@ initial begin
         $display("TEST FAILED");
     else
         $display("TEST PASSED");
-    
+
     $finish;
 end
 

@@ -90,8 +90,13 @@ module dma_to_m20k_bridge #(
                         current_addr <= base_addr;
                         words_remaining <= transfer_count;
                         active_buffer <= target_buffer;
-                        stream_ready <= 1'b1;
-                        state <= TRANSFER;
+                        // Zero-word transfer: nothing to do, complete immediately
+                        if (transfer_count == 16'd0) begin
+                            state <= DONE_STATE;
+                        end else begin
+                            stream_ready <= 1'b1;
+                            state <= TRANSFER;
+                        end
                     end
                 end
                 

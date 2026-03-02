@@ -175,7 +175,6 @@ module inference_controller #(
             case (state)
                 IDLE: begin
                     inference_done <= 1'b0;
-                    layer_count <= 8'd0;
                     instr_ready <= 1'b1;
                     
                     // Only clear signals when NOT transitioning out of IDLE
@@ -303,14 +302,16 @@ module inference_controller #(
                     bridge_start <= 1'b0;
                     collector_start <= {NUM_ARRAYS{1'b0}};
                     
-                    // Clear feeder_start and array_start to prepare for edge
+                    // Clear feeder_start and array_start to prepare for rising edge
                     feeder_start <= {NUM_ARRAYS{1'b0}};
                     array_start <= {NUM_ARRAYS{1'b0}};
                     
-                    if (bridge_done) begin
-                        $display("  [%0t ns] IC WAIT_ACTIVATION: bridge_done detected, transitioning to START_COMPUTE", $time/1000.0);
-                        state <= START_COMPUTE;
-                    end
+                    // FIX: bridge_done was already consumed in LOAD_ACTIVATION state
+                    // (bridge_done pulses for exactly 1 cycle in DONE_STATE, then deasserts).
+                    // This state's sole purpose is to clear start signals for one cycle
+                    // so START_COMPUTE can create a clean rising edge; no need to re-check bridge_done.
+                    $display("  [%0t ns] IC WAIT_ACTIVATION: signals cleared, transitioning to START_COMPUTE", $time/1000.0);
+                    state <= START_COMPUTE;
                 end
                 
                 START_COMPUTE: begin
@@ -447,8 +448,12 @@ module inference_controller #(
                     if (layer_count >= num_layers - 1) begin
                         state <= DONE;
                     end else begin
-                        instr_ready <= 1'b1;
-                        state <= IDLE;
+                        // Bypass IDLE for multi-layer: addresses already advanced
+                        // above; no need to re-fetch the instruction from comm_interface.
+                        // (instr_valid was already consumed and cleared for layer 1.)
+                        load_weights_issued   <= 1'b0;
+                        load_activation_issued <= 1'b0;
+                        state <= LOAD_WEIGHTS;
                     end
                 end
                 
@@ -461,6 +466,7 @@ module inference_controller #(
                     collector_start <= {NUM_ARRAYS{1'b0}};
                     
                     inference_done <= 1'b1;
+                    layer_count <= 8'd0;  // Reset for next inference run
                     state <= IDLE;
                 end
                 

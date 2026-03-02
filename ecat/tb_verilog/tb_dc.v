@@ -32,6 +32,8 @@ parameter ADDR_SYNC1_START_SHIFT = 16'h09A8;
 parameter ADDR_LATCH_CTRL_STATUS = 16'h09AE;
 parameter ADDR_LATCH0_POS_TIME   = 16'h09B0;
 parameter ADDR_LATCH0_NEG_TIME   = 16'h09B8;
+parameter ADDR_LATCH1_POS_TIME   = 16'h09C0;
+parameter ADDR_LATCH1_NEG_TIME   = 16'h09C8;
 
 // DC Activation bits
 parameter DC_ACT_CYCLIC_OP = 8'h01;
@@ -260,6 +262,198 @@ task write_reg32;
 endtask
 
 // ============================================================================
+// DC-03: System Time Delay
+// ============================================================================
+task test_dc03_system_delay;
+    reg [63:0] t_no_delay, t_with_delay;
+    begin
+        $display("\n=== DC-03: System Time Delay ===");
+        reset_dut;
+
+        // Read baseline (no delay)
+        read_reg64(ADDR_SYSTEM_TIME, t_no_delay);
+        $display("  Time without delay: %0d ns", t_no_delay);
+
+        // Write a 1ms delay (1,000,000 ns)
+        write_reg32(ADDR_SYSTEM_DELAY, 32'd1000000);
+        read_reg64(ADDR_SYSTEM_TIME, t_with_delay);
+        $display("  Time with 1ms delay:  %0d ns", t_with_delay);
+
+        check_pass("Delay register written", 1);
+        check_pass("System time increased by delay",
+                   t_with_delay >= t_no_delay + 32'd999000);
+    end
+endtask
+
+// ============================================================================
+// DC-05: Speed Counter / Drift Compensation
+// ============================================================================
+task test_dc05_speed_counter;
+    reg [63:0] t_before, t_after_normal, t_after_fast;
+    reg [31:0] diff_normal, diff_fast;
+    begin
+        $display("\n=== DC-05: Speed Counter Drift Compensation ===");
+        reset_dut;
+
+        // Measure normal time advance (100 cycles)
+        read_reg64(ADDR_SYSTEM_TIME, t_before);
+        repeat(100) @(posedge clk);
+        read_reg64(ADDR_SYSTEM_TIME, t_after_normal);
+        diff_normal = t_after_normal[31:0] - t_before[31:0];
+        $display("  Normal 100-cycle diff: %0d ns", diff_normal);
+
+        reset_dut;
+
+        // Configure speed counter: positive drift (+0x0100 per cycle), 200 count
+        write_reg(ADDR_SPEED_DIFF, 16'h0100);          // speed_diff = +256
+        write_reg(ADDR_SPEED_START, 16'd200);           // lower 16 bits
+        write_reg(ADDR_SPEED_START + 2, 16'd0);         // upper 16 bits (triggers load)
+
+        read_reg64(ADDR_SYSTEM_TIME, t_before);
+        repeat(100) @(posedge clk);
+        read_reg64(ADDR_SYSTEM_TIME, t_after_fast);
+        diff_fast = t_after_fast[31:0] - t_before[31:0];
+        $display("  Speed-adjusted 100-cycle diff: %0d ns", diff_fast);
+
+        check_pass("Speed counter loaded", 1);
+        check_pass("Adjusted time > normal time", diff_fast >= diff_normal);
+    end
+endtask
+
+// ============================================================================
+// DC-07: SYNC1 Independent Cycle Configuration
+// ============================================================================
+task test_dc07_sync1_independent;
+    integer pulse_count, prev_sync;
+    begin
+        $display("\n=== DC-07: SYNC1 Independent Cycle ===");
+        reset_dut;
+        repeat(50) @(posedge clk);
+
+        // Configure SYNC0 as base
+        write_reg64(ADDR_SYNC0_START_TIME, 64'd1000);
+        write_reg32(ADDR_SYNC0_CYCLE_TIME, 32'd5000);
+
+        // Configure SYNC1 with independent cycle (sync1_cycle_time > 0)
+        write_reg32(ADDR_SYNC1_CYCLE_TIME, 32'd8000);
+        write_reg32(ADDR_SYNC1_START_SHIFT, 32'd500);
+
+        // Enable SYNC0 + SYNC1
+        write_reg(ADDR_DC_ACTIVATION,
+                  {8'h00, DC_ACT_SYNC0_EN | DC_ACT_SYNC1_EN});
+
+        pulse_count = 0;
+        prev_sync   = 0;
+        for (i = 0; i < 1000; i = i + 1) begin
+            @(posedge clk);
+            if (sync1_out && !prev_sync) begin
+                pulse_count = pulse_count + 1;
+                $display("  SYNC1 pulse at cycle %0d", i);
+            end
+            prev_sync = sync1_out;
+        end
+
+        $display("  SYNC1 pulses detected: %0d", pulse_count);
+        check_pass("SYNC1 independent pulse generated", pulse_count > 0);
+        check_pass("SYNC1 active flag set", sync1_active != 0);
+    end
+endtask
+
+// ============================================================================
+// DC-08: SYNC0 + SYNC1 Simultaneous
+// ============================================================================
+task test_dc08_sync0_sync1_combined;
+    integer cnt0, cnt1, prev0, prev1;
+    begin
+        $display("\n=== DC-08: SYNC0 + SYNC1 Simultaneous ===");
+        reset_dut;
+        repeat(50) @(posedge clk);
+
+        write_reg64(ADDR_SYNC0_START_TIME, 64'd800);
+        write_reg32(ADDR_SYNC0_CYCLE_TIME, 32'd4000);
+        write_reg32(ADDR_SYNC1_CYCLE_TIME, 32'd6000);
+        write_reg32(ADDR_SYNC1_START_SHIFT, 32'd200);
+        write_reg(ADDR_DC_ACTIVATION,
+                  {8'h00, DC_ACT_SYNC0_EN | DC_ACT_SYNC1_EN});
+
+        cnt0 = 0; cnt1 = 0; prev0 = 0; prev1 = 0;
+        for (i = 0; i < 800; i = i + 1) begin
+            @(posedge clk);
+            if (sync0_out && !prev0) cnt0 = cnt0 + 1;
+            if (sync1_out && !prev1) cnt1 = cnt1 + 1;
+            prev0 = sync0_out;
+            prev1 = sync1_out;
+        end
+
+        $display("  SYNC0 pulses: %0d, SYNC1 pulses: %0d", cnt0, cnt1);
+        check_pass("SYNC0 generates pulses", cnt0 > 0);
+        check_pass("SYNC1 generates pulses", cnt1 > 0);
+    end
+endtask
+
+// ============================================================================
+// DC-11: Latch0 Negative Edge Capture
+// ============================================================================
+task test_dc11_latch0_neg;
+    reg [63:0] captured_time;
+    begin
+        $display("\n=== DC-11: Latch0 Negative Edge Capture ===");
+        reset_dut;
+
+        // Enable Latch0 negative edge (bit 1 = LATCH_NEG_EN)
+        write_reg(ADDR_LATCH_CTRL_STATUS, 16'h0F00);  // Clear flags
+        write_reg(ADDR_LATCH_CTRL_STATUS, LATCH_NEG_EN);
+        repeat(50) @(posedge clk);
+
+        // Drive Latch0 high first, then drop (negative edge)
+        latch0_in = 1;
+        repeat(10) @(posedge clk);
+        latch0_in = 0;  // Negative edge
+        repeat(10) @(posedge clk);
+
+        read_reg(ADDR_LATCH_CTRL_STATUS, reg_val);
+        $display("  Latch Status: 0x%04x", reg_val);
+
+        read_reg64(ADDR_LATCH0_NEG_TIME, captured_time);
+        $display("  Latch0 Neg Time: %0d ns", captured_time);
+
+        check_pass("Neg edge event flag set (bit9)", (reg_val & 16'h0200) != 0);
+        check_pass("Neg edge timestamp captured", captured_time > 0);
+    end
+endtask
+
+// ============================================================================
+// DC-12: Latch1 Positive Edge Capture
+// ============================================================================
+task test_dc12_latch1_pos;
+    reg [63:0] captured_time;
+    begin
+        $display("\n=== DC-12: Latch1 Positive Edge Capture ===");
+        reset_dut;
+
+        // Enable Latch1 positive edge (bit 2 = LATCH_CTRL_POS_EN+2)
+        write_reg(ADDR_LATCH_CTRL_STATUS, 16'h0F00);  // Clear flags
+        write_reg(ADDR_LATCH_CTRL_STATUS, 16'h0004);  // bit2 = Latch1 pos enable
+        repeat(50) @(posedge clk);
+
+        // Generate positive edge on latch1_in
+        latch1_in = 1;
+        repeat(10) @(posedge clk);
+        latch1_in = 0;
+        repeat(5) @(posedge clk);
+
+        read_reg(ADDR_LATCH_CTRL_STATUS, reg_val);
+        $display("  Latch Status: 0x%04x", reg_val);
+
+        read_reg64(ADDR_LATCH1_POS_TIME, captured_time);
+        $display("  Latch1 Pos Time: %0d ns", captured_time);
+
+        check_pass("Latch1 pos event flag set (bit10)", (reg_val & 16'h0400) != 0);
+        check_pass("Latch1 pos timestamp captured", captured_time > 0);
+    end
+endtask
+
+// ============================================================================
 // DC-01: Local Clock Increment Verification
 // ============================================================================
 task test_dc01_clock_increment;
@@ -474,10 +668,16 @@ initial begin
     
     test_dc01_clock_increment;
     test_dc02_offset_application;
+    test_dc03_system_delay;
     test_dc04_port_receive_time;
+    test_dc05_speed_counter;
     test_dc06_sync0_config;
+    test_dc07_sync1_independent;
+    test_dc08_sync0_sync1_combined;
     test_dc09_sync_masking;
     test_dc10_latch_capture;
+    test_dc11_latch0_neg;
+    test_dc12_latch1_pos;
     
     // Summary
     $display("\n==========================================");

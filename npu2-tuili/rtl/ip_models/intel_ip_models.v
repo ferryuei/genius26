@@ -31,7 +31,10 @@ module comm_interface #(
     // Instruction Output
     output reg  [INSTR_WIDTH-1:0]       instruction,
     output reg                          instr_valid,
-    input  wire                         instr_ready
+    input  wire                         instr_ready,
+    
+    // Inference mode flag: when high, IC is the active consumer of instructions
+    input  wire                         start_inference
 );
 
     //==========================================================================
@@ -69,8 +72,13 @@ module comm_interface #(
         end else begin
             dma_start <= 1'b0;
             
-            // Don't auto-clear instr_valid based on instr_ready
-            // Let it stay valid until a new instruction arrives
+            // Clear instr_valid when inference_controller consumes the instruction.
+            // Guard with start_inference so that control_unit consuming an instruction
+            // (start_inference=0 path) does NOT clear the valid flag – the instruction
+            // must remain visible for IC once start_inference goes high.
+            if (start_inference && instr_valid && instr_ready) begin
+                instr_valid <= 1'b0;
+            end
             
             if (xcvr_rx_valid && xcvr_rx_ready) begin
                 case (pkt_type)

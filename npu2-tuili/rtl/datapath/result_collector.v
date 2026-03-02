@@ -122,6 +122,12 @@ module result_collector #(
                         if (result_counter >= expected_results - 1) begin
                             $display("  [%0t ns] Result Collector[%m]: All results collected, entering FLUSH", 
                                      $time/1000.0);
+                            // FIX: Assert done immediately when all results are collected into M20K/FIFO.
+                            // Previously done was only asserted in FLUSH after the stream FIFO drained,
+                            // which required dma_wr_ready - but DMA write isn't started until the IC
+                            // sees done (circular dependency). Asserting done here unblocks the IC to
+                            // proceed to WRITEBACK and start DMA write, which then drains the FIFO.
+                            done <= 1'b1;
                             state <= FLUSH;
                         end
                     end else begin

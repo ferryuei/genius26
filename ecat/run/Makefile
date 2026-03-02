@@ -116,12 +116,16 @@ VERILOG_TESTS = \
 	tb_sync_manager \
 	tb_dc \
 	tb_frame_receiver \
+	tb_frame_transmitter \
 	tb_sii_eeprom \
 	tb_coe_handler \
 	tb_pdi \
 	tb_mii \
 	tb_port_controller \
 	tb_sm \
+	tb_mailbox_handler \
+	tb_soe_handler \
+	tb_voe_handler \
 	tb_ethercat_top
 
 # iverilog-compatible tests (subset with pure Verilog RTL)
@@ -326,6 +330,30 @@ verilator-tb_sm: $(BUILD_DIR) $(WAVE_DIR)
 	cd $(BUILD_DIR) && $(VERILATOR) $(VERILATOR_FLAGS) \
 		--top-module tb_sm -Mdir obj_sm -o tb_sm \
 		$(ABS_LIB)/ecat_dpram.sv $(ABS_RTL)/data/ecat_sync_manager.sv $(ABS_TB_V)/tb_sm.v
+
+verilator-tb_frame_transmitter: $(BUILD_DIR) $(WAVE_DIR)
+	@echo "=== Building tb_frame_transmitter (Verilator) ==="
+	cd $(BUILD_DIR) && $(VERILATOR) $(VERILATOR_FLAGS) \
+		--top-module tb_frame_transmitter -Mdir obj_frame_transmitter -o tb_frame_transmitter \
+		$(ABS_RTL)/frame/ecat_frame_transmitter.sv $(ABS_TB_V)/tb_frame_transmitter.v
+
+verilator-tb_mailbox_handler: $(BUILD_DIR) $(WAVE_DIR)
+	@echo "=== Building tb_mailbox_handler (Verilator) ==="
+	cd $(BUILD_DIR) && $(VERILATOR) $(VERILATOR_FLAGS) \
+		--top-module tb_mailbox_handler -Mdir obj_mailbox_handler -o tb_mailbox_handler \
+		$(ABS_RTL)/mailbox/ecat_mailbox_handler.sv $(ABS_TB_V)/tb_mailbox_handler.v
+
+verilator-tb_soe_handler: $(BUILD_DIR) $(WAVE_DIR)
+	@echo "=== Building tb_soe_handler (Verilator) ==="
+	cd $(BUILD_DIR) && $(VERILATOR) $(VERILATOR_FLAGS) \
+		--top-module tb_soe_handler -Mdir obj_soe_handler -o tb_soe_handler \
+		$(ABS_RTL)/mailbox/ecat_soe_handler.sv $(ABS_TB_V)/tb_soe_handler.v
+
+verilator-tb_voe_handler: $(BUILD_DIR) $(WAVE_DIR)
+	@echo "=== Building tb_voe_handler (Verilator) ==="
+	cd $(BUILD_DIR) && $(VERILATOR) $(VERILATOR_FLAGS) \
+		--top-module tb_voe_handler -Mdir obj_voe_handler -o tb_voe_handler \
+		$(ABS_RTL)/mailbox/ecat_voe_handler.sv $(ABS_TB_V)/tb_voe_handler.v
 
 # Integration testbench (full system)
 verilator-tb_ethercat_top: $(BUILD_DIR) $(WAVE_DIR)

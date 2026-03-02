@@ -254,7 +254,8 @@ module npu_top_integrated #(
         .dma_done           (dma_done),
         .instruction        (instruction),
         .instr_valid        (instr_valid),
-        .instr_ready        (instr_ready)
+        .instr_ready        (instr_ready),
+        .start_inference    (start_inference)
     );
     
     //==========================================================================
