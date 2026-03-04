@@ -76,7 +76,7 @@ module switch_fabric #(
     // Round-robin arbiter per egress port
     // Selects which ingress port writes into this egress FIFO this cycle
     // -------------------------------------------------------------------------
-    reg [PORT_NUM-1:0] rr_ptr [0:PORT_NUM-1]; // per-egress RR pointer
+    reg [1:0] rr_ptr [0:PORT_NUM-1]; // per-egress RR pointer (binary counter)
 
     // Write side: for each egress port, find highest-priority requesting ingress
     // (among ing_valid & ing_dst[ep] & !fifo_full[ep])
@@ -108,7 +108,7 @@ module switch_fabric #(
         integer e, p, pp;
         if (!rst_n) begin
             for (e = 0; e < PORT_NUM; e = e+1) begin
-                rr_ptr[e]  <= {{PORT_NUM-1{1'b0}}, 1'b1}; // start at port 0
+                rr_ptr[e]  <= 2'd0; // start at port 0 (binary counter)
                 grant_r[e] <= {PORT_NUM{1'b0}};
             end
         end else begin
@@ -123,9 +123,9 @@ module switch_fabric #(
                 // Advance RR pointer if a grant was given
                 if (grant_r[e] != {PORT_NUM{1'b0}}) begin
                     if (rr_ptr[e] == PORT_NUM-1)
-                        rr_ptr[e] <= 0;
+                        rr_ptr[e] <= 2'd0;
                     else
-                        rr_ptr[e] <= rr_ptr[e] + 1'b1;
+                        rr_ptr[e] <= rr_ptr[e] + 2'd1;
                 end
             end
         end

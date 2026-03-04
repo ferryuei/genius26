@@ -104,11 +104,11 @@ module l2_switch_top #(
     wire [31:0] stat_tx_drop  [0:PORT_NUM-1];
 
     // =========================================================================
-    // FDB Table (shared, port 0 lookup has priority here; production use a
-    // proper multi-port arbiter)
+    // FDB Table (shared with round-robin arbiter)
     // =========================================================================
-    // Arbitrate 4 lookup/learn requests — simple priority: port 0 > 1 > 2 > 3
-    reg  [1:0]       fdb_arb_port;
+    // Arbitrate 4 lookup/learn requests — round-robin for fairness
+    reg  [1:0]       fdb_rr_ptr_lkp;
+    reg  [1:0]       fdb_rr_ptr_lrn;
     wire             fdb_arb_lkp_valid;
     wire [47:0]      fdb_arb_lkp_mac;
     wire             fdb_arb_lrn_valid;
@@ -118,25 +118,76 @@ module l2_switch_top #(
     wire [PORT_NUM-1:0] fdb_port_o;
     wire             fdb_done_o;
 
-    // Priority mux
-    assign fdb_arb_lkp_valid = fdb_lkp_valid[0] ? fdb_lkp_valid[0] :
-                               fdb_lkp_valid[1] ? fdb_lkp_valid[1] :
-                               fdb_lkp_valid[2] ? fdb_lkp_valid[2] :
-                                                  fdb_lkp_valid[3];
-    assign fdb_arb_lkp_mac   = fdb_lkp_valid[0] ? fdb_lkp_mac[0] :
-                               fdb_lkp_valid[1] ? fdb_lkp_mac[1] :
-                               fdb_lkp_valid[2] ? fdb_lkp_mac[2] :
+    // Round-robin lookup arbiter
+    reg              fdb_lkp_grant [0:PORT_NUM-1];
+    reg [1:0]        fdb_lkp_winner;
+
+    always @(*) begin : fdb_lkp_arb
+        integer i, offset;
+        fdb_lkp_winner = 2'd0;
+        for (i = 0; i < PORT_NUM; i = i+1)
+            fdb_lkp_grant[i] = 1'b0;
+
+        for (i = 0; i < PORT_NUM; i = i+1) begin
+            offset = (fdb_rr_ptr_lkp + i) % PORT_NUM;
+            if (fdb_lkp_valid[offset] && !fdb_lkp_grant[0] && !fdb_lkp_grant[1] &&
+                !fdb_lkp_grant[2] && !fdb_lkp_grant[3]) begin
+                fdb_lkp_grant[offset] = 1'b1;
+                fdb_lkp_winner = offset[1:0];
+            end
+        end
+    end
+
+    assign fdb_arb_lkp_valid = fdb_lkp_grant[0] | fdb_lkp_grant[1] |
+                               fdb_lkp_grant[2] | fdb_lkp_grant[3];
+    assign fdb_arb_lkp_mac   = fdb_lkp_grant[0] ? fdb_lkp_mac[0] :
+                               fdb_lkp_grant[1] ? fdb_lkp_mac[1] :
+                               fdb_lkp_grant[2] ? fdb_lkp_mac[2] :
                                                   fdb_lkp_mac[3];
-    assign fdb_arb_lrn_valid = fdb_lrn_valid[0] | fdb_lrn_valid[1] |
-                               fdb_lrn_valid[2] | fdb_lrn_valid[3];
-    assign fdb_arb_lrn_mac   = fdb_lrn_valid[0] ? fdb_lrn_mac[0] :
-                               fdb_lrn_valid[1] ? fdb_lrn_mac[1] :
-                               fdb_lrn_valid[2] ? fdb_lrn_mac[2] :
+
+    // Round-robin learn arbiter
+    reg              fdb_lrn_grant [0:PORT_NUM-1];
+    reg [1:0]        fdb_lrn_winner;
+
+    always @(*) begin : fdb_lrn_arb
+        integer i, offset;
+        fdb_lrn_winner = 2'd0;
+        for (i = 0; i < PORT_NUM; i = i+1)
+            fdb_lrn_grant[i] = 1'b0;
+
+        for (i = 0; i < PORT_NUM; i = i+1) begin
+            offset = (fdb_rr_ptr_lrn + i) % PORT_NUM;
+            if (fdb_lrn_valid[offset] && !fdb_lrn_grant[0] && !fdb_lrn_grant[1] &&
+                !fdb_lrn_grant[2] && !fdb_lrn_grant[3]) begin
+                fdb_lrn_grant[offset] = 1'b1;
+                fdb_lrn_winner = offset[1:0];
+            end
+        end
+    end
+
+    assign fdb_arb_lrn_valid = fdb_lrn_grant[0] | fdb_lrn_grant[1] |
+                               fdb_lrn_grant[2] | fdb_lrn_grant[3];
+    assign fdb_arb_lrn_mac   = fdb_lrn_grant[0] ? fdb_lrn_mac[0] :
+                               fdb_lrn_grant[1] ? fdb_lrn_mac[1] :
+                               fdb_lrn_grant[2] ? fdb_lrn_mac[2] :
                                                   fdb_lrn_mac[3];
-    assign fdb_arb_lrn_port  = fdb_lrn_valid[0] ? fdb_lrn_port[0] :
-                               fdb_lrn_valid[1] ? fdb_lrn_port[1] :
-                               fdb_lrn_valid[2] ? fdb_lrn_port[2] :
+    assign fdb_arb_lrn_port  = fdb_lrn_grant[0] ? fdb_lrn_port[0] :
+                               fdb_lrn_grant[1] ? fdb_lrn_port[1] :
+                               fdb_lrn_grant[2] ? fdb_lrn_port[2] :
                                                   fdb_lrn_port[3];
+
+    // Update round-robin pointers
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            fdb_rr_ptr_lkp <= 2'd0;
+            fdb_rr_ptr_lrn <= 2'd0;
+        end else begin
+            if (fdb_arb_lkp_valid)
+                fdb_rr_ptr_lkp <= (fdb_lkp_winner + 1'b1) % PORT_NUM;
+            if (fdb_arb_lrn_valid)
+                fdb_rr_ptr_lrn <= (fdb_lrn_winner + 1'b1) % PORT_NUM;
+        end
+    end
 
     // Broadcast result back to all ingress (each checks if it is the active requester)
     genvar p;
@@ -178,32 +229,21 @@ module l2_switch_top #(
     );
 
     // =========================================================================
-    // VLAN Table
+    // VLAN Table (multi-port lookup support)
     // =========================================================================
-    // All ports share one VLAN table; each ingress port provides its vid
-    // (simple: use port 0's vid for now; production: replicate or time-mux)
     vlan_table #(.PORT_NUM(PORT_NUM)) u_vlan (
         .clk            (clk),
         .rst_n          (rst_n),
-        .lkp_vid        (vlan_vid[0]),
-        .lkp_member     (vlan_member[0]),
-        .lkp_untagged   (vlan_untagged[0]),
-        .lkp_valid      (vlan_valid_o[0]),
+        .lkp_vid        (vlan_vid),
+        .lkp_member     (vlan_member),
+        .lkp_untagged   (vlan_untagged),
+        .lkp_valid      (vlan_valid_o),
         .cpu_wr_en      (apb_psel & apb_penable & apb_pwrite & (apb_paddr[15:12] == 4'h2)),
         .cpu_wr_vid     (apb_paddr[11:0]),
         .cpu_wr_member  (apb_pwdata[PORT_NUM-1:0]),
         .cpu_wr_untagged(apb_pwdata[PORT_NUM+3:PORT_NUM]),
         .cpu_wr_valid   (apb_pwdata[8])
     );
-
-    // Replicate VLAN results to all ports (simplified)
-    generate
-        for (p = 1; p < PORT_NUM; p = p+1) begin : gen_vlan_rep
-            assign vlan_member[p]   = vlan_member[0];
-            assign vlan_untagged[p] = vlan_untagged[0];
-            assign vlan_valid_o[p]  = vlan_valid_o[0];
-        end
-    endgenerate
 
     // =========================================================================
     // STP Controller

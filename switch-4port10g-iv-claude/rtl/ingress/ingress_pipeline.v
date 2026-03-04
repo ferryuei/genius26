@@ -93,6 +93,8 @@ module ingress_pipeline #(
     reg [PORT_NUM-1:0]  dst_mask_r;
     reg                 drop_r;
     reg [3:0]           hdr_cnt;
+    reg                 backpressure;  // Flow control flag
+    reg [15:0]          frame_byte_cnt; // Frame length counter
 
     // Byte lane buffer (64-bit XGMII = 8 bytes/cycle)
     reg [7:0]           byte_buf [0:5]; // capture MAC bytes across cycles
@@ -100,6 +102,10 @@ module ingress_pipeline #(
 
     // Default VLAN per port (PVID), configurable; here static = 1
     localparam [11:0] PVID = 12'd1;
+
+    // Frame length limits
+    localparam [15:0] MIN_FRAME_LEN = 16'd64;   // Minimum Ethernet frame
+    localparam [15:0] MAX_FRAME_LEN = 16'd1518; // Standard max (no jumbo)
 
     assign vlan_lkp_vid = tagged_r ? vid_r : PVID;
 
@@ -121,6 +127,8 @@ module ingress_pipeline #(
             drop_r          <= 0;
             tagged_r        <= 0;
             hdr_cnt         <= 0;
+            backpressure    <= 0;
+            frame_byte_cnt  <= 0;
         end else begin
             fdb_lkp_valid   <= 0;
             fdb_learn_valid <= 0;
@@ -134,11 +142,14 @@ module ingress_pipeline #(
                     drop_r   <= 0;
                     tagged_r <= 0;
                     hdr_cnt  <= 0;
+                    frame_byte_cnt <= 0;
                     // Detect SOP: first byte of XGMII lane 0 is START
                     if (xgmii_rxc[0] && xgmii_rxd[7:0] == XGMII_START && rx_en) begin
                         rx_state <= RX_PREAM;
+                        frame_byte_cnt <= DATA_W/8; // Count preamble/SFD
                     end else if (xgmii_rxc[0] && xgmii_rxd[7:0] == XGMII_START && !rx_en) begin
                         drop_r <= 1;
+                        frame_byte_cnt <= DATA_W/8;
                         rx_state <= RX_PAYLOAD; // drain and drop
                     end
                 end
@@ -154,10 +165,12 @@ module ingress_pipeline #(
                     // We capture DST MAC from next two 64-bit words.
                     dst_mac_r[47:16] <= xgmii_rxd[63:32]; // bytes 0..3 of DST
                     hdr_cnt <= 1;
+                    frame_byte_cnt <= frame_byte_cnt + DATA_W/8;
                     rx_state <= RX_HDR_DST;
                 end
 
                 RX_HDR_DST: begin
+                    frame_byte_cnt <= frame_byte_cnt + DATA_W/8;
                     if (hdr_cnt == 1) begin
                         dst_mac_r[15:0] <= xgmii_rxd[15:0]; // bytes 4..5 of DST
                         src_mac_r[47:32] <= xgmii_rxd[47:16]; // bytes 0..3 of SRC
@@ -171,6 +184,7 @@ module ingress_pipeline #(
                 end
 
                 RX_HDR_SRC: begin
+                    frame_byte_cnt <= frame_byte_cnt + DATA_W/8;
                     src_mac_r[15:0]  <= xgmii_rxd[15:0];
                     etype_r          <= xgmii_rxd[31:16];
                     rx_state <= RX_HDR_ETYPE;
@@ -178,6 +192,7 @@ module ingress_pipeline #(
 
                 // -----------------------------------------------------------------
                 RX_HDR_ETYPE: begin
+                    frame_byte_cnt <= frame_byte_cnt + DATA_W/8;
                     // Check for 802.1Q tag (0x8100)
                     if (etype_r == 16'h8100) begin
                         prio_r   <= xgmii_rxd[15:13];
@@ -204,51 +219,85 @@ module ingress_pipeline #(
                 // -----------------------------------------------------------------
                 RX_LKP_WAIT: begin
                     if (fdb_lkp_done) begin
+                        // Calculate destination mask based on lookup result
                         if (fdb_lkp_hit && !dst_mac_r[40]) begin
                             // Unicast hit: forward only to learned port
-                            dst_mask_r <= fdb_lkp_port & ~(1 << PORT_ID);
+                            dst_mask_r <= (fdb_lkp_port & ~(1 << PORT_ID)) & vlan_member;
                         end else if (!dst_mac_r[40]) begin
                             // Unknown unicast: flood (excl src port)
-                            dst_mask_r <= {PORT_NUM{1'b1}} & ~(1 << PORT_ID);
+                            dst_mask_r <= ({PORT_NUM{1'b1}} & ~(1 << PORT_ID)) & vlan_member;
+                        end else begin
+                            // Multicast/broadcast: flood (excl src port)
+                            dst_mask_r <= ({PORT_NUM{1'b1}} & ~(1 << PORT_ID)) & vlan_member;
                         end
-                        // Apply VLAN member filter (vlan_member registered 1 cycle prior)
-                        dst_mask_r <= dst_mask_r & vlan_member;
+
                         // Learn src MAC (if port is learn-enabled)
                         if (learn_en && !src_mac_r[40]) begin // don't learn multicast src
                             fdb_learn_valid <= 1'b1;
                             fdb_learn_mac   <= src_mac_r;
                             fdb_learn_port  <= (1 << PORT_ID);
                         end
-                        rx_state <= RX_PAYLOAD;
-                        // Emit SOF cell
-                        cell_valid    <= 1'b1;
-                        cell_sof      <= 1'b1;
-                        cell_data     <= xgmii_rxd;
-                        cell_dst_mask <= dst_mask_r & vlan_member;
-                        cell_src_mask <= (1 << PORT_ID);
-                        cell_vid      <= vid_r;
-                        cell_prio     <= prio_r;
-                        cell_drop     <= drop_r || (dst_mask_r == 0);
-                        stat_rx_pkts  <= stat_rx_pkts + 1'b1;
+
+                        // Check backpressure before transitioning to PAYLOAD
+                        if (cell_ready) begin
+                            rx_state <= RX_PAYLOAD;
+                            backpressure <= 1'b0;
+                            // Emit SOF cell
+                            cell_valid    <= 1'b1;
+                            cell_sof      <= 1'b1;
+                            cell_data     <= xgmii_rxd;
+                            cell_dst_mask <= dst_mask_r;
+                            cell_src_mask <= (1 << PORT_ID);
+                            cell_vid      <= vid_r;
+                            cell_prio     <= prio_r;
+                            cell_drop     <= drop_r || (dst_mask_r == 0);
+                            stat_rx_pkts  <= stat_rx_pkts + 1'b1;
+                        end else begin
+                            // Fabric FIFO full, stay in wait state
+                            backpressure <= 1'b1;
+                        end
                     end
                 end
 
                 // -----------------------------------------------------------------
                 RX_PAYLOAD: begin
-                    if (xgmii_rxc != 0) begin
-                        // Control byte present — could be TERM
+                    // Check backpressure before sending data
+                    if (!cell_ready) begin
+                        backpressure <= 1'b1;
+                        // Stay in PAYLOAD state, don't advance frame
+                    end else if (xgmii_rxc != 0) begin
+                        // Control byte present — could be TERM (end of frame)
+                        frame_byte_cnt <= frame_byte_cnt + DATA_W/8;
+
+                        // Check frame length validity
+                        if (frame_byte_cnt < MIN_FRAME_LEN) begin
+                            // Runt frame: too short
+                            drop_r <= 1'b1;
+                        end else if (frame_byte_cnt > MAX_FRAME_LEN) begin
+                            // Oversize frame: too long
+                            drop_r <= 1'b1;
+                        end
+
                         cell_valid <= 1'b1;
                         cell_eof   <= 1'b1;
                         cell_data  <= xgmii_rxd;
                         cell_drop  <= drop_r;
-                        stat_rx_bytes <= stat_rx_bytes + DATA_W/8;
+                        stat_rx_bytes <= stat_rx_bytes + frame_byte_cnt;
                         if (drop_r) stat_rx_drop <= stat_rx_drop + 1'b1;
                         rx_state <= RX_IDLE;
+                        backpressure <= 1'b0;
                     end else begin
+                        frame_byte_cnt <= frame_byte_cnt + DATA_W/8;
+
+                        // Check for oversize frame during reception
+                        if (frame_byte_cnt > MAX_FRAME_LEN) begin
+                            drop_r <= 1'b1;
+                        end
+
                         cell_valid <= 1'b1;
                         cell_data  <= xgmii_rxd;
                         cell_drop  <= drop_r;
-                        stat_rx_bytes <= stat_rx_bytes + DATA_W/8;
+                        backpressure <= 1'b0;
                     end
                 end
 

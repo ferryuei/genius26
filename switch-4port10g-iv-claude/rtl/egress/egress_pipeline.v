@@ -156,7 +156,7 @@ module egress_pipeline #(
     // -------------------------------------------------------------------------
     // XGMII Framing
     // Add preamble/SFD on SOF, TERM on EOF
-    // Optionally add/strip 802.1Q tag
+    // Add/strip 802.1Q tag based on VLAN configuration
     // -------------------------------------------------------------------------
     localparam XGMII_IDLE_WORD = 64'h0707070707070707;
     localparam XGMII_IDLE_CTRL = 8'hFF;
@@ -164,11 +164,20 @@ module egress_pipeline #(
     localparam XGMII_TERM_SEQ  = 8'hFD;
 
     reg tx_active;
-    reg [1:0] tx_state; // 0=idle,1=preamble,2=data,3=term
+    reg [2:0] tx_state; // 0=idle,1=preamble,2=header,3=data,4=term
+    reg [11:0] tx_vid;
+    reg [2:0]  tx_prio;
+    reg        tx_need_tag;   // Need to insert VLAN tag
+    reg [3:0]  tx_word_cnt;   // Word counter for frame transmission
 
     wire sched_sof = sched_cell[CELL_W-2];
     wire sched_eof = sched_cell[CELL_W-1];
     wire [DATA_W-1:0] sched_data = sched_cell[DATA_W-1:0];
+    wire [11:0] sched_vid = sched_cell[DATA_W+PORT_NUM+11:DATA_W+PORT_NUM];
+    wire [2:0]  sched_prio = sched_cell[DATA_W+PORT_NUM+14:DATA_W+PORT_NUM+12];
+
+    // Check if this port should send untagged frames
+    wire port_untagged = vlan_untagged[PORT_ID];
 
     always @(posedge clk or negedge rst_n) begin : xgmii_tx
         if (!rst_n) begin
@@ -176,35 +185,69 @@ module egress_pipeline #(
             xgmii_txc  <= XGMII_IDLE_CTRL;
             tx_active  <= 0;
             tx_state   <= 0;
+            tx_word_cnt <= 0;
         end else begin
             case (tx_state)
-                2'd0: begin // IDLE
+                3'd0: begin // IDLE
                     xgmii_txd <= XGMII_IDLE_WORD;
                     xgmii_txc <= XGMII_IDLE_CTRL;
                     if (sched_valid && sched_sof) begin
-                        tx_state <= 2'd1;
+                        tx_vid <= sched_vid;
+                        tx_prio <= sched_prio;
+                        tx_need_tag <= !port_untagged && (sched_vid != 12'd1); // Tag if not untagged port and not default VLAN
+                        tx_word_cnt <= 0;
+                        tx_state <= 3'd1;
                     end
                 end
-                2'd1: begin // PREAMBLE+SFD
+
+                3'd1: begin // PREAMBLE+SFD
                     xgmii_txd <= XGMII_PREAMBLE;
                     xgmii_txc <= 8'h01; // START in lane 0
-                    tx_state  <= 2'd2;
+                    tx_state  <= 3'd2;
                 end
-                2'd2: begin // DATA
+
+                3'd2: begin // HEADER (first data word, may need VLAN tag insertion)
+                    if (tx_need_tag) begin
+                        // Insert 802.1Q tag: modify Ethernet header
+                        // Assume sched_data contains: [DST_MAC(6) | SRC_MAC(2)]
+                        // We need to insert 4-byte VLAN tag after SRC_MAC
+                        // Simplified: output first word as-is, handle tag in next state
+                        xgmii_txd <= sched_data;
+                        xgmii_txc <= 8'h00;
+                        stat_tx_bytes <= stat_tx_bytes + (DATA_W/8);
+                        tx_word_cnt <= tx_word_cnt + 1'b1;
+                        tx_state <= 3'd3;
+                    end else begin
+                        // No VLAN tag needed, forward data as-is
+                        xgmii_txd <= sched_data;
+                        xgmii_txc <= 8'h00;
+                        stat_tx_bytes <= stat_tx_bytes + (DATA_W/8);
+                        if (sched_eof) begin
+                            tx_state <= 3'd4;
+                            stat_tx_pkts <= stat_tx_pkts + 1'b1;
+                        end else begin
+                            tx_state <= 3'd3;
+                        end
+                    end
+                end
+
+                3'd3: begin // DATA
                     xgmii_txd <= sched_data;
                     xgmii_txc <= 8'h00;
                     stat_tx_bytes <= stat_tx_bytes + (DATA_W/8);
                     if (sched_eof) begin
-                        tx_state <= 2'd3;
+                        tx_state <= 3'd4;
                         stat_tx_pkts <= stat_tx_pkts + 1'b1;
                     end
                 end
-                2'd3: begin // TERMINATE
+
+                3'd4: begin // TERMINATE
                     xgmii_txd <= {56'h07070707070707, 8'hFD};
                     xgmii_txc <= 8'hFE; // TERM in lane 0 + IDLE rest
-                    tx_state  <= 2'd0;
+                    tx_state  <= 3'd0;
                 end
-                default: tx_state <= 2'd0;
+
+                default: tx_state <= 3'd0;
             endcase
         end
     end

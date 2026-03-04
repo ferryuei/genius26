@@ -11,11 +11,11 @@ module vlan_table #(
     input  wire                 clk,
     input  wire                 rst_n,
 
-    // Lookup (combinational via registered output)
-    input  wire [VLAN_BITS-1:0] lkp_vid,
-    output reg  [PORT_NUM-1:0]  lkp_member,    // ports that belong to this VLAN
-    output reg  [PORT_NUM-1:0]  lkp_untagged,  // ports that strip the tag on egress
-    output reg                  lkp_valid,     // VLAN exists
+    // Multi-port lookup interface (one per port)
+    input  wire [VLAN_BITS-1:0] lkp_vid      [0:PORT_NUM-1],
+    output reg  [PORT_NUM-1:0]  lkp_member   [0:PORT_NUM-1],
+    output reg  [PORT_NUM-1:0]  lkp_untagged [0:PORT_NUM-1],
+    output reg                  lkp_valid    [0:PORT_NUM-1],
 
     // CPU write interface
     input  wire                 cpu_wr_en,
@@ -45,17 +45,22 @@ module vlan_table #(
             vlan_mem[cpu_wr_vid] <= {cpu_wr_valid, cpu_wr_untagged, cpu_wr_member};
     end
 
-    // Read (1-cycle registered)
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            lkp_member   <= {PORT_NUM{1'b1}};
-            lkp_untagged <= {PORT_NUM{1'b0}};
-            lkp_valid    <= 1'b0;
-        end else begin
-            lkp_valid    <= vlan_mem[lkp_vid][ENTRY_W-1];
-            lkp_untagged <= vlan_mem[lkp_vid][PORT_NUM*2-1:PORT_NUM];
-            lkp_member   <= vlan_mem[lkp_vid][PORT_NUM-1:0];
+    // Read (1-cycle registered, multi-port)
+    genvar p;
+    generate
+        for (p = 0; p < PORT_NUM; p = p+1) begin : gen_vlan_lookup
+            always @(posedge clk or negedge rst_n) begin
+                if (!rst_n) begin
+                    lkp_member[p]   <= {PORT_NUM{1'b1}};
+                    lkp_untagged[p] <= {PORT_NUM{1'b0}};
+                    lkp_valid[p]    <= 1'b0;
+                end else begin
+                    lkp_valid[p]    <= vlan_mem[lkp_vid[p]][ENTRY_W-1];
+                    lkp_untagged[p] <= vlan_mem[lkp_vid[p]][PORT_NUM*2-1:PORT_NUM];
+                    lkp_member[p]   <= vlan_mem[lkp_vid[p]][PORT_NUM-1:0];
+                end
+            end
         end
-    end
+    endgenerate
 
 endmodule

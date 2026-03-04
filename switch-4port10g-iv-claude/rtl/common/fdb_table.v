@@ -178,8 +178,27 @@ module fdb_table #(
                 end
 
                 ST_LEARN: begin
-                    // If empty or same MAC: update; if collision: overwrite (simple policy)
-                    if (!rd_data[52] || rd_data[47:0] == pend_learn_mac) begin
+                    // Collision resolution: replace if empty, same MAC, or older entry
+                    if (!rd_data[52]) begin
+                        // Empty slot: write new entry
+                        fdb_mem[rd_addr_r] <= {
+                            AGE_MAX,
+                            1'b0,           // not static
+                            1'b1,           // valid
+                            pend_learn_port,
+                            pend_learn_mac
+                        };
+                    end else if (rd_data[47:0] == pend_learn_mac) begin
+                        // Same MAC: update port and refresh age
+                        fdb_mem[rd_addr_r] <= {
+                            AGE_MAX,
+                            rd_data[53],    // preserve static flag
+                            1'b1,           // valid
+                            pend_learn_port,
+                            pend_learn_mac
+                        };
+                    end else if (!rd_data[53] && rd_data[73:54] < (AGE_MAX >> 1)) begin
+                        // Collision: replace if existing entry is non-static and aged (< 50%)
                         fdb_mem[rd_addr_r] <= {
                             AGE_MAX,
                             1'b0,           // not static
@@ -188,7 +207,7 @@ module fdb_table #(
                             pend_learn_mac
                         };
                     end
-                    // else: collision, keep existing (could extend to chaining)
+                    // else: collision with fresh or static entry, keep existing
                     state <= ST_IDLE;
                 end
 
